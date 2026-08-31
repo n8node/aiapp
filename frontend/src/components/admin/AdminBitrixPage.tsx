@@ -197,13 +197,13 @@ export function AdminBitrixPage() {
             {" "}(Inbound webhook). Название можно поставить <span className="font-mono">RigIntel</span>.
           </li>
           <li>
-            Права оставьте только на чтение:{" "}
+            В правах вебхука отметьте оба пункта и сохраните вебхук в Битриксе:{" "}
             <span className="font-medium">Пользователи</span> (<span className="font-mono">user</span>) и{" "}
-            <span className="font-medium">Структура компании / подразделения</span>{" "}
-            (<span className="font-mono">department</span>). CRM, диск и задачи не
-            включайте — для синхронизации отделов они не нужны.
+            <span className="font-medium">Структура компании</span>{" "}
+            (<span className="font-mono">department</span>). Без второго права отделы не подтянутся.
+            CRM, диск и задачи не включайте.
           </li>
-          <li>Сохраните и скопируйте <span className="font-medium">URL вебхука</span> целиком. Секрет уже есть в пути.</li>
+          <li>Скопируйте <span className="font-medium">URL вебхука</span> целиком после сохранения прав. Секрет уже есть в пути.</li>
           <li>Вставьте URL сюда → «Сохранить» → «Проверить» → «Синхронизировать сейчас».</li>
         </ol>
         <p className="mt-3 text-sm text-slate-600">

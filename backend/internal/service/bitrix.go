@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -143,6 +144,28 @@ func (s *BitrixService) webhookURL(ctx context.Context) (string, error) {
 	return raw, nil
 }
 
+func wrapBitrix(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &BitrixAPIError{Public: bitrix.PublicError(err)}
+}
+
+type BitrixAPIError struct {
+	Public string
+}
+
+func (e *BitrixAPIError) Error() string {
+	if e != nil && e.Public != "" {
+		return e.Public
+	}
+	return ErrBitrixRequest.Error()
+}
+
+func (e *BitrixAPIError) Unwrap() error {
+	return ErrBitrixRequest
+}
+
 func (s *BitrixService) Test(ctx context.Context) error {
 	raw, err := s.webhookURL(ctx)
 	if err != nil {
@@ -153,7 +176,10 @@ func (s *BitrixService) Test(ctx context.Context) error {
 		return ErrBitrixInvalidURL
 	}
 	if err := s.client.CurrentUser(ctx, u); err != nil {
-		return ErrBitrixRequest
+		return wrapBitrix(err)
+	}
+	if _, err := s.client.ListDepartments(ctx, u); err != nil {
+		return wrapBitrix(err)
 	}
 	return nil
 }
@@ -177,23 +203,59 @@ func (s *BitrixService) Sync(ctx context.Context, actorID string) (*model.Bitrix
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 
-	deps, err := s.client.ListDepartments(ctx, u)
-	if err != nil {
-		_ = s.store.InsertRun(parent, actorID, "FAILED", "Не удалось получить подразделения", 0, 0)
-		return nil, ErrBitrixRequest
+	deps, depErr := s.client.ListDepartments(ctx, u)
+	users, userErr := s.client.ListUsers(ctx, u)
+	if userErr != nil {
+		msg := "Не удалось получить сотрудников"
+		if depErr != nil {
+			msg = bitrix.PublicError(depErr)
+		} else {
+			msg = bitrix.PublicError(userErr)
+		}
+		_ = s.store.InsertRun(parent, actorID, "FAILED", msg, 0, 0)
+		if depErr != nil {
+			return nil, wrapBitrix(depErr)
+		}
+		return nil, wrapBitrix(userErr)
 	}
-	users, err := s.client.ListUsers(ctx, u)
-	if err != nil {
-		_ = s.store.InsertRun(parent, actorID, "FAILED", "Не удалось получить сотрудников", 0, 0)
-		return nil, ErrBitrixRequest
+	warning := ""
+	if depErr != nil {
+		warning = bitrix.PublicError(depErr)
+		deps = departmentsFromUsers(users)
 	}
 	if err := s.store.ReplaceSnapshot(ctx, deps, users); err != nil {
 		_ = s.store.InsertRun(parent, actorID, "FAILED", "Не удалось сохранить структуру", 0, 0)
 		return nil, err
 	}
-	_ = s.store.InsertRun(parent, actorID, "SUCCESS", "", len(deps), len(users))
+	status := "SUCCESS"
+	if warning != "" {
+		status = "PARTIAL"
+	}
+	_ = s.store.InsertRun(parent, actorID, status, warning, len(deps), len(users))
 	s.audit.Write(ctx, actorID, "bitrix.sync", u.Hostname())
 	return &model.BitrixSyncResult{Departments: len(deps), Users: len(users)}, nil
+}
+
+func departmentsFromUsers(users []bitrix.User) []bitrix.Department {
+	seen := map[int64]struct{}{}
+	var out []bitrix.Department
+	for _, u := range users {
+		for _, id := range u.DepartmentIDs {
+			if id <= 0 {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			out = append(out, bitrix.Department{
+				ID:   id,
+				Name: "Отдел " + strconv.FormatInt(id, 10),
+				Sort: int(id),
+			})
+		}
+	}
+	return out
 }
 
 func (s *BitrixService) Departments(ctx context.Context) ([]model.BitrixDepartment, error) {

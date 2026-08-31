@@ -30,6 +30,10 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 }
 
 func mapAuthError(err error) (int, string, string) {
+	var bitrixAPI *service.BitrixAPIError
+	if errors.As(err, &bitrixAPI) && bitrixAPI.Public != "" {
+		return http.StatusBadGateway, "bitrix_request", bitrixAPI.Public
+	}
 	switch {
 	case errors.Is(err, service.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid_credentials", "Неверный email или пароль"

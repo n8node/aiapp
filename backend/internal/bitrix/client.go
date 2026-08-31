@@ -1,8 +1,10 @@
 package bitrix
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -73,49 +75,161 @@ func NewClient() *Client {
 	}
 }
 
-type apiEnvelope struct {
-	Result json.RawMessage `json:"result"`
-	Next   json.RawMessage `json:"next"`
-	Error  string          `json:"error"`
+type CallError struct {
+	Code   string
+	Public string
 }
 
-func (c *Client) Call(ctx context.Context, base *url.URL, method string, query url.Values) (json.RawMessage, int, error) {
+func (e *CallError) Error() string {
+	if e == nil {
+		return "bitrix request failed"
+	}
+	if e.Code != "" {
+		return e.Code
+	}
+	return e.Public
+}
+
+func PublicError(err error) string {
+	var call *CallError
+	if errors.As(err, &call) && call.Public != "" {
+		return call.Public
+	}
+	return "Битрикс24 не ответил или отклонил запрос. Проверьте права вебхука."
+}
+
+type apiEnvelope struct {
+	Result           json.RawMessage `json:"result"`
+	Next             json.RawMessage `json:"next"`
+	Error            json.RawMessage `json:"error"`
+	ErrorDescription string          `json:"error_description"`
+}
+
+func (c *Client) Call(ctx context.Context, base *url.URL, method string, params map[string]any) (json.RawMessage, int, error) {
 	endpoint, err := url.Parse(bitrixurl.MethodURL(base, method))
 	if err != nil {
-		return nil, 0, fmt.Errorf("bitrix url")
+		return nil, 0, &CallError{Public: "Некорректный URL вебхука"}
 	}
-	if query != nil {
-		endpoint.RawQuery = query.Encode()
+	raw, next, err := c.doJSON(ctx, endpoint, params)
+	if err != nil && isRetryableTransport(err) {
+		return c.doGET(ctx, endpoint, params)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
+	return raw, next, err
+}
+
+func isRetryableTransport(err error) bool {
+	var call *CallError
+	if !errors.As(err, &call) {
+		return false
+	}
+	return call.Code == "not_json" || call.Code == "unreachable"
+}
+
+func (c *Client) doJSON(ctx context.Context, endpoint *url.URL, params map[string]any) (json.RawMessage, int, error) {
+	if params == nil {
+		params = map[string]any{}
+	}
+	payload, err := json.Marshal(params)
 	if err != nil {
-		return nil, 0, fmt.Errorf("bitrix request")
+		return nil, 0, &CallError{Public: "Не удалось подготовить запрос к Битрикс24"}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
+	if err != nil {
+		return nil, 0, &CallError{Public: "Не удалось подготовить запрос к Битрикс24"}
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "RigIntel/1.0")
+	return c.finish(req)
+}
+
+func (c *Client) doGET(ctx context.Context, endpoint *url.URL, params map[string]any) (json.RawMessage, int, error) {
+	u := *endpoint
+	q := u.Query()
+	for k, v := range params {
+		q.Set(k, fmt.Sprint(v))
+	}
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, 0, &CallError{Public: "Не удалось подготовить запрос к Битрикс24"}
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "RigIntel/1.0")
+	return c.finish(req)
+}
+
+func (c *Client) finish(req *http.Request) (json.RawMessage, int, error) {
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("bitrix unreachable")
+		return nil, 0, &CallError{Code: "unreachable", Public: "Битрикс24 недоступен с сервера RigIntel"}
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
 	if err != nil {
-		return nil, 0, fmt.Errorf("bitrix response")
+		return nil, 0, &CallError{Code: "not_json", Public: "Битрикс24 вернул неполный ответ"}
 	}
 	if len(body) > maxBody {
-		return nil, 0, fmt.Errorf("bitrix response")
+		return nil, 0, &CallError{Code: "not_json", Public: "Ответ Битрикс24 слишком большой"}
 	}
-	var env apiEnvelope
-	if err := json.Unmarshal(body, &env); err != nil {
-		return nil, 0, fmt.Errorf("bitrix response")
+	env, err := parseEnvelope(body)
+	if err != nil {
+		return nil, 0, err
 	}
-	if env.Error != "" || res.StatusCode >= 400 {
-		return nil, 0, fmt.Errorf("bitrix rejected")
+	if code := errorCode(env.Error); code != "" || res.StatusCode >= 400 {
+		if code == "" {
+			code = strconv.Itoa(res.StatusCode)
+		}
+		return nil, 0, &CallError{Code: code, Public: publicBitrixError(code, env.ErrorDescription)}
 	}
 	next := 0
 	if len(env.Next) > 0 && string(env.Next) != "null" {
 		next, _ = strconv.Atoi(strings.Trim(string(env.Next), `"`))
 	}
 	return env.Result, next, nil
+}
+
+func parseEnvelope(body []byte) (apiEnvelope, error) {
+	var env apiEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return env, &CallError{Code: "not_json", Public: "Битрикс24 вернул не JSON. Проверьте URL вебхука."}
+	}
+	return env, nil
+}
+
+func errorCode(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	s := strings.TrimSpace(string(raw))
+	if s == "null" || s == `""` || s == "false" || s == "0" {
+		return ""
+	}
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		return strings.TrimSpace(asString)
+	}
+	return ""
+}
+
+func publicBitrixError(code, description string) string {
+	switch strings.ToLower(code) {
+	case "insufficient_scope", "error_method_not_found", "access_denied", "invalid_credentials":
+		return "У вебхука нет права «Структура компании» (department). Откройте вебхук в Битрикс, включите это право, сохраните и синхронизируйте снова."
+	case "no_auth_found":
+		return "Битрикс не принял вебхук. Скопируйте URL ещё раз после сохранения прав."
+	case "query_limit_exceeded":
+		return "Битрикс временно ограничил частоту запросов. Повторите синхронизацию через минуту."
+	}
+	if description != "" && len(description) <= 180 && !looksSecret(description) {
+		return "Битрикс24 отклонил запрос: " + description
+	}
+	return "Битрикс24 отклонил запрос. Проверьте права вебхука: Пользователи и Структура компании."
+}
+
+func looksSecret(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.Contains(lower, "rest/") || strings.Contains(lower, "http")
 }
 
 func (c *Client) CurrentUser(ctx context.Context, base *url.URL) error {
@@ -143,11 +257,11 @@ func (c *Client) ListDepartments(ctx context.Context, base *url.URL) ([]Departme
 	var out []Department
 	start := 0
 	for {
-		q := url.Values{}
+		params := map[string]any{"sort": "SORT", "order": "ASC"}
 		if start > 0 {
-			q.Set("start", strconv.Itoa(start))
+			params["start"] = start
 		}
-		raw, next, err := c.Call(ctx, base, "department.get", q)
+		raw, next, err := c.Call(ctx, base, "department.get", params)
 		if err != nil {
 			return nil, err
 		}
@@ -187,11 +301,11 @@ func (c *Client) ListUsers(ctx context.Context, base *url.URL) ([]User, error) {
 	var out []User
 	start := 0
 	for {
-		q := url.Values{}
+		params := map[string]any{}
 		if start > 0 {
-			q.Set("start", strconv.Itoa(start))
+			params["start"] = start
 		}
-		raw, next, err := c.Call(ctx, base, "user.get", q)
+		raw, next, err := c.Call(ctx, base, "user.get", params)
 		if err != nil {
 			return nil, err
 		}
