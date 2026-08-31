@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "react-qr-code";
+import { OtpCells, type OtpStatus } from "@/components/auth/OtpCells";
 import { ApiError, confirmTotp, fetchMe, setupTotp } from "@/lib/api";
 
 export function TotpSetupForm() {
@@ -12,6 +13,8 @@ export function TotpSetupForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [otpStatus, setOtpStatus] = useState<OtpStatus>("idle");
+  const tried = useRef("");
 
   useEffect(() => {
     setupTotp()
@@ -25,28 +28,39 @@ export function TotpSetupForm() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await confirmTotp(code);
-      const me = await fetchMe();
-      router.push(me.data.user.is_platform_admin ? "/admin/users" : "/dashboard");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Неверный код");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (code.length < 6) {
+      tried.current = "";
+      if (otpStatus === "error") setOtpStatus("idle");
+      return;
     }
-  }
+    if (code === tried.current || otpStatus === "verifying" || otpStatus === "success") {
+      return;
+    }
+    tried.current = code;
+    setOtpStatus("verifying");
+    setError("");
+    void confirmTotp(code)
+      .then(async () => {
+        setOtpStatus("success");
+        const me = await fetchMe();
+        window.setTimeout(() => {
+          router.push(me.data.user.is_platform_admin ? "/admin/users" : "/dashboard");
+          router.refresh();
+        }, 450);
+      })
+      .catch((err) => {
+        setOtpStatus("error");
+        setError(err instanceof ApiError ? err.message : "Неверный код");
+      });
+  }, [code, otpStatus, router]);
 
   if (!secret && loading) {
     return <p className="text-sm text-muted">Готовим ключ двухфакторной аутентификации…</p>;
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="rounded-xl border border-border bg-bg px-4 py-3 text-sm">
         <p className="font-medium text-text">Как подключить</p>
         <ol className="mt-2 list-decimal space-y-2 pl-4 text-muted">
@@ -75,7 +89,7 @@ export function TotpSetupForm() {
             Яндекс ID выберите «Настроить 2FA TOTP» → «Добавить ключ вручную»
             и введите секрет под QR-кодом.
           </li>
-          <li>Введите сюда 6 цифр из приложения и подтвердите.</li>
+          <li>Введите 6 цифр в ячейки — проверка начнётся сама.</li>
         </ol>
         <p className="mt-3 text-xs text-muted">
           Подойдёт и другое приложение с TOTP. Подробнее:{" "}
@@ -101,26 +115,27 @@ export function TotpSetupForm() {
           <code className="break-all font-mono text-xs">{secret}</code>
         </div>
       ) : null}
-      <label className="block text-sm">
-        <span className="text-muted">Код из приложения</span>
-        <input
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
+      <div className="space-y-2">
+        <p className="text-center text-sm text-muted">Код из приложения</p>
+        <OtpCells
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-          placeholder="000000"
+          onChange={setCode}
+          status={otpStatus}
+          disabled={!secret}
         />
-      </label>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={loading || code.length !== 6}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {loading ? "Проверка…" : "Подтвердить и продолжить"}
-      </button>
-    </form>
+        {otpStatus === "verifying" ? (
+          <p className="text-center text-xs text-muted">Проверяем код…</p>
+        ) : null}
+        {otpStatus === "success" ? (
+          <p className="text-center text-xs font-medium text-emerald-700">Код подтверждён</p>
+        ) : null}
+        {otpStatus === "error" && error ? (
+          <p className="text-center text-xs text-red-700">{error}</p>
+        ) : null}
+        {error && otpStatus !== "error" ? (
+          <p className="text-center text-sm text-red-700">{error}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
