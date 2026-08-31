@@ -62,7 +62,7 @@ func (a *JWT) Parse(token string) (userID, sessionID string, err error) {
 	return c.UserID, c.SessionID, nil
 }
 
-const cookiePath = "/app"
+const cookiePath = "/" // site root: Unsloth Vite assets live at /assets, not /app
 
 func (a *JWT) SetCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
@@ -77,15 +77,17 @@ func (a *JWT) SetCookie(w http.ResponseWriter, token string) {
 }
 
 func (a *JWT) ClearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     AccessCookie,
-		Value:    "",
-		Path:     cookiePath,
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   a.secure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	for _, path := range []string{cookiePath, "/app"} {
+		http.SetCookie(w, &http.Cookie{
+			Name:     AccessCookie,
+			Value:    "",
+			Path:     path,
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   a.secure,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
 }
 
 func ExtractToken(r *http.Request) string {

@@ -88,6 +88,9 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, err)
 		return
 	}
+	if raw := authn.ExtractToken(r); raw != "" {
+		h.tokens.SetCookie(w, raw)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"user":             user,
