@@ -10,6 +10,7 @@ services:
       - ./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
       - ./nginx/snippets/rigintel-locations.conf:/etc/nginx/snippets/rigintel-locations.conf:ro
       - ./nginx/snippets/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+      - ./nginx/snippets/unsloth-proxy.conf:/etc/nginx/snippets/unsloth-proxy.conf:ro
     logging:
       driver: json-file
       options:
