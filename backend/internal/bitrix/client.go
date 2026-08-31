@@ -110,9 +110,9 @@ func (c *Client) Call(ctx context.Context, base *url.URL, method string, params 
 	if err != nil {
 		return nil, 0, &CallError{Public: "Некорректный URL вебхука"}
 	}
-	raw, next, err := c.doJSON(ctx, endpoint, params)
+	raw, next, err := c.doGET(ctx, endpoint, params)
 	if err != nil && isRetryableTransport(err) {
-		return c.doGET(ctx, endpoint, params)
+		return c.doJSON(ctx, endpoint, params)
 	}
 	return raw, next, err
 }
@@ -257,7 +257,7 @@ func (c *Client) ListDepartments(ctx context.Context, base *url.URL) ([]Departme
 	var out []Department
 	start := 0
 	for {
-		params := map[string]any{"sort": "SORT", "order": "ASC"}
+		params := map[string]any{}
 		if start > 0 {
 			params["start"] = start
 		}

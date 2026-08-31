@@ -43,6 +43,17 @@ func TestMaskWebhookHidesSecret(t *testing.T) {
 	}
 }
 
+func TestMethodURLAddsJSON(t *testing.T) {
+	u, err := NormalizeWebhook("https://bitrix.rigintel.ai/rest/1/abcTOKEN99/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := MethodURL(u, "department.get")
+	if !strings.HasSuffix(got, "/department.get.json") {
+		t.Fatalf("got %s", got)
+	}
+}
+
 func TestBlockedIP(t *testing.T) {
 	if !BlockedIP(net.ParseIP("10.0.0.1")) || !BlockedIP(net.ParseIP("192.168.1.1")) {
 		t.Fatal("private should block")

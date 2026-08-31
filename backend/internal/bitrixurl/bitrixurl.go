@@ -112,6 +112,9 @@ func MaskWebhook(raw string) string {
 
 func MethodURL(base *url.URL, method string) string {
 	method = strings.Trim(method, "/")
+	if method != "" && !strings.HasSuffix(strings.ToLower(method), ".json") {
+		method += ".json"
+	}
 	u := *base
 	u.Path = strings.TrimSuffix(base.Path, "/") + "/" + method
 	return u.String()
