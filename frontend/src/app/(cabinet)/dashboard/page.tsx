@@ -16,8 +16,8 @@ export default async function DashboardPage() {
       {ws ? (
         <p className="mt-2 text-sm text-muted">
           Сейчас открыто пространство <span className="font-medium text-text">{ws.name}</span>
-          {ws.role ? ` · ${roleLabel(ws.role)}` : ""}. Чат по базе знаний и сверка
-          документов появятся на следующих этапах.
+          {ws.role ? ` · ${roleLabel(ws.role)}` : ""}. Чат по базе знаний появится позже.
+          Карточки документов уже в разделе «Документы».
         </p>
       ) : (
         <p className="mt-2 text-sm text-muted">

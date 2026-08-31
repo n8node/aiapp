@@ -27,6 +27,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  ai-runtime:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     build:
       args:

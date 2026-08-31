@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { HardDrive, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { FileText, HardDrive, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
 import { logout, switchWorkspace, type User, type Workspace } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 const nav = [
   { href: "/dashboard", label: "Обзор", icon: LayoutDashboard },
   { href: "/files", label: "Файлы", icon: HardDrive },
+  { href: "/documents", label: "Документы", icon: FileText },
   { href: "/settings", label: "Настройки", icon: Settings },
 ];
 
@@ -129,7 +130,7 @@ export function AppShell({
         <div
           className={cn(
             "mx-auto px-4 py-6 sm:px-6 lg:px-8",
-            pathname.startsWith("/files") || pathname.startsWith("/settings") || pathname.startsWith("/dashboard")
+            pathname.startsWith("/files") || pathname.startsWith("/documents") || pathname.startsWith("/settings") || pathname.startsWith("/dashboard")
               ? "max-w-none"
               : "max-w-7xl",
           )}

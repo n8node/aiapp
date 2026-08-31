@@ -58,6 +58,10 @@ func main() {
 	uploadSessions := service.NewUploadSessionService(cfg.JWTSecret)
 	diskRepo := repository.NewDiskRepository(handle)
 	diskSvc := service.NewDiskService(diskRepo, authSvc, objectStore, uploadSessions, audit)
+	docRepo := repository.NewDocumentRepository(handle)
+	extractor := service.NewHTTPExtractor(cfg.ExtractURL, cfg.ExtractToken)
+	docSvc := service.NewDocumentService(docRepo, diskSvc, objectStore, authSvc, audit, extractor)
+	ingestWorker := service.NewIngestWorker(docRepo, objectStore, extractor, logger)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
 		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
@@ -72,13 +76,17 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Minute,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
+
+	runCtx, runCancel := context.WithCancel(context.Background())
+	defer runCancel()
+	go ingestWorker.Run(runCtx)
 
 	go func() {
 		logger.Info("server starting", "addr", httpServer.Addr, "version", config.Version)
@@ -91,6 +99,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	runCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

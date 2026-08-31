@@ -26,6 +26,16 @@ func AllowedExtension(name string) bool {
 	return ok
 }
 
+func Ingestible(name string) bool {
+	switch Extension(name) {
+	case "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp",
+		"rtf", "txt", "csv", "md", "jpg", "jpeg", "png", "gif", "webp", "tif", "tiff":
+		return true
+	default:
+		return false
+	}
+}
+
 func MaxSizeBytes(mimeType, name string) int64 {
 	m := strings.ToLower(mimeType)
 	n := strings.ToLower(name)

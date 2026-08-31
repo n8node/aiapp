@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fileContentURL, formatBytes, type WorkspaceFile } from "@/lib/files-api";
-import { isArchiveFile } from "@/lib/file-view";
+import { isArchiveFile, isIngestibleFile } from "@/lib/file-view";
 
 type Props = {
   file: WorkspaceFile;
@@ -24,6 +24,8 @@ type Props = {
   onCopy: () => void;
   onExtract?: () => void;
   extracting?: boolean;
+  onIngest?: () => void;
+  ingesting?: boolean;
   onDelete: () => void;
 };
 
@@ -49,7 +51,7 @@ function isAudioMime(mime: string, name: string) {
   return ["mp3", "wav", "m4a", "ogg"].includes(ext);
 }
 
-export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, onExtract, extracting, onDelete }: Props) {
+export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, onExtract, extracting, onIngest, ingesting, onDelete }: Props) {
   const previewSrc = fileContentURL(file.id, "inline");
   const isImage = file.mime_type.startsWith("image/");
   const isVideo = isVideoMime(file.mime_type, file.name);
@@ -162,6 +164,17 @@ export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, o
               >
                 <FolderArchive className="h-4 w-4" />
                 {extracting ? "Распаковка…" : "Распаковать"}
+              </button>
+            ) : null}
+            {onIngest && isIngestibleFile(file) ? (
+              <button
+                type="button"
+                disabled={ingesting}
+                onClick={onIngest}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50"
+              >
+                <FileText className="h-4 w-4" />
+                {ingesting ? "Отправка…" : "Отправить в документы"}
               </button>
             ) : null}
             <button

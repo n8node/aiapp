@@ -93,6 +93,10 @@ func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 				kind = "upload"
 			case strings.HasSuffix(path, "/extract") && strings.Contains(path, "/disk/files/"):
 				kind = "extract"
+			case path == "/api/v1/documents/from-file":
+				kind = "ingest"
+			case strings.HasSuffix(path, "/retry") && strings.Contains(path, "/documents/"):
+				kind = "ingest"
 			default:
 				next.ServeHTTP(w, r)
 				return
@@ -106,6 +110,9 @@ func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 				msg := "Слишком много загрузок, подождите"
 				if kind == "extract" {
 					msg = "Слишком много распаковок, подождите"
+				}
+				if kind == "ingest" {
+					msg = "Слишком много запросов на обработку, подождите"
 				}
 				writeError(w, http.StatusTooManyRequests, "rate_limited", msg)
 				return

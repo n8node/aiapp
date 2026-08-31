@@ -109,6 +109,16 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusBadRequest, "archive_limit", "Архив слишком большой или в нём слишком много файлов"
 	case errors.Is(err, service.ErrDiskArchiveEncrypt):
 		return http.StatusBadRequest, "archive_encrypted", "Архив защищён паролем"
+	case errors.Is(err, service.ErrDocumentNotFound):
+		return http.StatusNotFound, "document_not_found", "Документ не найден"
+	case errors.Is(err, service.ErrDocumentNotIngestible):
+		return http.StatusBadRequest, "not_ingestible", "Этот файл нельзя отправить в документы"
+	case errors.Is(err, service.ErrDocumentInvalidState):
+		return http.StatusConflict, "invalid_state", "Документ в этом статусе нельзя изменить"
+	case errors.Is(err, service.ErrExtractUnavailable):
+		return http.StatusBadGateway, "extract_unavailable", "Сервис извлечения текста недоступен"
+	case errors.Is(err, service.ErrObjectTooLarge):
+		return http.StatusRequestEntityTooLarge, "file_too_large", "Файл слишком большой"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

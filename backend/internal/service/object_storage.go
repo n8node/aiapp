@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +23,7 @@ import (
 
 var (
 	ErrStorageNotConfigured = fmt.Errorf("storage not configured")
+	ErrObjectTooLarge       = errors.New("object too large")
 )
 
 type ObjectStorage struct {
@@ -112,6 +117,47 @@ func browserUploadHeaders(contentType string, signed http.Header) map[string]str
 	}
 	headers["Content-Type"] = contentType
 	return headers
+}
+
+func (o *ObjectStorage) HashAndSize(ctx context.Context, s3Key string, max int64) (string, int64, error) {
+	if max <= 0 {
+		max = filesniff.MaxSizeBytes("", "a.pdf")
+	}
+	stream, err := o.OpenObject(ctx, s3Key, "")
+	if err != nil {
+		return "", 0, err
+	}
+	defer stream.Body.Close()
+	h := sha256.New()
+	n, err := io.Copy(h, io.LimitReader(stream.Body, max+1))
+	if err != nil {
+		return "", 0, err
+	}
+	if n > max {
+		return "", n, ErrObjectTooLarge
+	}
+	return hex.EncodeToString(h.Sum(nil)), n, nil
+}
+
+func (o *ObjectStorage) DownloadToFile(ctx context.Context, s3Key, dest string, max int64) error {
+	stream, err := o.OpenObject(ctx, s3Key, "")
+	if err != nil {
+		return err
+	}
+	defer stream.Body.Close()
+	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	n, err := io.Copy(f, io.LimitReader(stream.Body, max+1))
+	if err != nil {
+		return err
+	}
+	if n > max {
+		return ErrObjectTooLarge
+	}
+	return nil
 }
 
 func (o *ObjectStorage) OpenObject(ctx context.Context, s3Key, rangeHeader string) (*ObjectStream, error) {

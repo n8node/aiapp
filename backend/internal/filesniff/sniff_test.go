@@ -29,6 +29,15 @@ func TestHeadMatches(t *testing.T) {
 	}
 }
 
+func TestIngestible(t *testing.T) {
+	if !Ingestible("act.PDF") || !Ingestible("scan.png") || !Ingestible("notes.txt") {
+		t.Fatal("allow")
+	}
+	if Ingestible("pack.zip") || Ingestible("clip.mp4") || Ingestible("a.exe") {
+		t.Fatal("reject")
+	}
+}
+
 func TestMIMEMatchesExtension(t *testing.T) {
 	if !MIMEMatchesExtension("application/pdf", "x.pdf") {
 		t.Fatal("pdf mime")

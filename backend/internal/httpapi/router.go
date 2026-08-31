@@ -20,6 +20,7 @@ type Dependencies struct {
 	Workspaces *service.WorkspaceService
 	Storage    *service.StorageSettingsService
 	Disk       *service.DiskService
+	Documents  *service.DocumentService
 	Tokens     *authn.JWT
 }
 
@@ -31,6 +32,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	workspaceH := NewWorkspaceHandler(deps.Workspaces)
 	storageH := NewStorageHandler(deps.Storage)
 	diskH := NewDiskHandler(deps.Disk)
+	docsH := NewDocumentHandler(deps.Documents)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -83,6 +85,11 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Post("/disk/trash/restore", diskH.RestoreTrash)
 				r.Post("/disk/trash/empty", diskH.EmptyTrash)
 				r.Delete("/disk/trash/{id}", diskH.PermanentDelete)
+				r.Get("/documents", docsH.List)
+				r.Post("/documents/from-file", docsH.FromFile)
+				r.Get("/documents/{documentID}", docsH.Get)
+				r.Post("/documents/{documentID}/versions/{versionID}/review", docsH.Review)
+				r.Post("/documents/{documentID}/versions/{versionID}/retry", docsH.Retry)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)

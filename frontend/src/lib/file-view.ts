@@ -84,6 +84,15 @@ export function isArchiveFile(file: Pick<WorkspaceFile, "name" | "mime_type">): 
   return classifyFile(file) === "archive";
 }
 
+const INGESTIBLE_EXT = new Set([
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp",
+  "rtf", "txt", "csv", "md", "jpg", "jpeg", "png", "gif", "webp", "tif", "tiff",
+]);
+
+export function isIngestibleFile(file: Pick<WorkspaceFile, "name">): boolean {
+  return INGESTIBLE_EXT.has(extOf(file.name));
+}
+
 export function kindLabel(kind: Exclude<FileKind, "all">): string {
   return FILE_KIND_TABS.find((t) => t.id === kind)?.label ?? "Файл";
 }

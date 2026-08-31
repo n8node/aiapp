@@ -21,6 +21,8 @@ type Config struct {
 	SuperadminEmail    string   `env:"SUPERADMIN_EMAIL"`
 	SuperadminPassword string   `env:"SUPERADMIN_PASSWORD"`
 	SuperadminName     string   `env:"SUPERADMIN_NAME" envDefault:"George"`
+	ExtractURL         string   `env:"EXTRACT_URL"`
+	ExtractToken       string   `env:"EXTRACT_TOKEN"`
 }
 
 func Load() (*Config, error) {
@@ -34,6 +36,10 @@ func Load() (*Config, error) {
 	if cfg.TOTPKey == "" {
 		cfg.TOTPKey = cfg.JWTSecret
 	}
+	if cfg.ExtractToken == "" {
+		cfg.ExtractToken = cfg.JWTSecret
+	}
+	cfg.ExtractURL = strings.TrimRight(strings.TrimSpace(cfg.ExtractURL), "/")
 	if cfg.IsProduction() {
 		cfg.CookieSecure = true
 		if cfg.JWTSecret == "" || cfg.JWTSecret == "dev-only-change-me" {

@@ -26,12 +26,32 @@ services:
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-George}
+      EXTRACT_URL: http://ai-runtime:8090
+      EXTRACT_TOKEN: ${JWT_SECRET}
     depends_on:
       postgres:
+        condition: service_healthy
+      ai-runtime:
         condition: service_healthy
     networks:
       - app
       - data
+    restart: unless-stopped
+
+  ai-runtime:
+    build:
+      context: ./ai-runtime
+      dockerfile: Dockerfile
+    environment:
+      EXTRACT_TOKEN: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/live', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 20s
+    networks:
+      - app
     restart: unless-stopped
 
   frontend:

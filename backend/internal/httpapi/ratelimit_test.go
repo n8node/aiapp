@@ -67,3 +67,22 @@ func TestLimitDiskUploadPerUser(t *testing.T) {
 		t.Fatalf("other user got %d", rec.Code)
 	}
 }
+
+func TestLimitDocumentIngest(t *testing.T) {
+	upload := newRateLimiter(time.Minute, 1)
+	h := limitDiskUpload(upload)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/from-file", nil)
+	req = req.WithContext(authn.WithUser(req.Context(), "user-a", "sess"))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("first got %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second got %d", rec.Code)
+	}
+}
