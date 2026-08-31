@@ -125,8 +125,17 @@ export function AppShell({
           </div>
         </div>
       </aside>
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+      <main className="min-w-0 flex-1 overflow-x-clip">
+        <div
+          className={cn(
+            "mx-auto px-4 py-6 sm:px-6 lg:px-8",
+            pathname.startsWith("/files") || pathname.startsWith("/settings") || pathname.startsWith("/dashboard")
+              ? "max-w-none"
+              : "max-w-7xl",
+          )}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );

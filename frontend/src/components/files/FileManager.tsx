@@ -20,6 +20,7 @@ import {
 import { PageHeader, type Crumb } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { FileIcon } from "@/components/files/FileIcon";
+import { FileDetailPanel } from "@/components/files/FileDetailPanel";
 import { MoveTargetDialog, type MoveTarget } from "@/components/files/MoveTargetDialog";
 import { MediaGalleryGrid, type MediaGridMode } from "@/components/files/MediaGalleryGrid";
 import { UploadProgressPanel } from "@/components/files/UploadProgressPanel";
@@ -96,6 +97,7 @@ export function FileManager({
   const [selectedKinds, setSelectedKinds] = useState<Map<string, "file" | "folder">>(new Map());
   const [uploadJobs, setUploadJobs] = useState<UploadJob[]>([]);
   const [moveDialog, setMoveDialog] = useState<{ mode: "move" | "copy" } | null>(null);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mediaGridMode, setMediaGridMode] = useState<MediaGridMode>("compact");
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,7 +151,15 @@ export function FileManager({
     setSelected(new Set());
     setSelectedKinds(new Map());
     setUploadJobs([]);
+    setPreviewFileId(null);
   }, [workspace?.id]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (previewFileId && !files.some((f) => f.id === previewFileId)) {
+      setPreviewFileId(null);
+    }
+  }, [loading, files, previewFileId]);
 
   useEffect(() => {
     if (section !== "my-files" || !folderId) {
@@ -349,6 +359,8 @@ export function FileManager({
   const grouped = section !== "trash" && section !== "my-files" ? groupByDate(files) : null;
   const isUploading = uploadJobs.some((j) => j.status === "pending" || j.status === "uploading");
   const isGallerySection = section === "photos" || section === "videos";
+  const previewFile = previewFileId ? (files.find((f) => f.id === previewFileId) ?? null) : null;
+  const showDetail = Boolean(previewFile && section !== "trash");
 
   const myFilesTitle = useMemo(() => {
     if (!folderId) return "Файлы";
@@ -496,6 +508,7 @@ export function FileManager({
               onClick={() => {
                 setSection(id);
                 if (id !== "my-files") setFolderId(null);
+                setPreviewFileId(null);
               }}
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm",
@@ -509,6 +522,7 @@ export function FileManager({
         </nav>
       </aside>
 
+      <div className="flex min-w-0 flex-1 gap-3 xl:gap-4">
       <div className="min-w-0 flex-1">
         <PageHeader
           title={section === "my-files" ? myFilesTitle : (SECTIONS.find((s) => s.id === section)?.label ?? "Файлы")}
@@ -675,13 +689,19 @@ export function FileManager({
                     files={groupFiles}
                     mode={mediaGridMode}
                     selected={selected}
-                    onOpen={(f) => openFile(f.id, "inline")}
+                    onOpen={(f) => setPreviewFileId(f.id)}
                     onToggleSelect={(id) => toggleSelect(id, "file")}
                   />
                 ) : (
                   <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
                     {groupFiles.map((f) => (
-                      <div key={f.id} className="group flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50">
+                      <div
+                        key={f.id}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50",
+                          previewFileId === f.id && "bg-accent/5",
+                        )}
+                      >
                         <button
                           type="button"
                           onClick={() => toggleSelect(f.id, "file")}
@@ -693,7 +713,11 @@ export function FileManager({
                         >
                           {selected.has(f.id) ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
                         </button>
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => section !== "trash" && setPreviewFileId(f.id)}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        >
                           <FileIcon fileId={f.id} name={f.name} mimeType={f.mime_type} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{f.name}</p>
@@ -701,7 +725,7 @@ export function FileManager({
                               {formatBytes(f.size)} · {formatFileTime(f.created_at)}
                             </p>
                           </div>
-                        </div>
+                        </button>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
                           {section !== "trash" ? (
                             <>
@@ -771,6 +795,23 @@ export function FileManager({
             ))}
           </div>
         )}
+      </div>
+
+      {showDetail && previewFile ? (
+        <FileDetailPanel
+          file={previewFile}
+          onClose={() => setPreviewFileId(null)}
+          onDownload={() => openFile(previewFile.id, "attachment")}
+          onRename={() => void handleRename("file", previewFile.id, previewFile.name)}
+          onCopy={() => void copyFile(previewFile.id, folderId).then(refresh)}
+          onDelete={() =>
+            void deleteFile(previewFile.id).then(() => {
+              setPreviewFileId(null);
+              void refresh();
+            })
+          }
+        />
+      ) : null}
       </div>
 
       {selected.size > 0 ? (
