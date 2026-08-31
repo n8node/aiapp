@@ -40,6 +40,7 @@ const settingsDomainsKey = "auth.allowed_email_domains"
 const tokenTTL = 7 * 24 * time.Hour
 
 var slugSanitizer = regexp.MustCompile(`[^a-z0-9-]+`)
+var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 type AuthService struct {
 	users      *repository.UserRepository
@@ -71,9 +72,9 @@ func NewAuthService(
 }
 
 type AuthResult struct {
-	Token     string
-	User      model.User
-	Workspace *model.Workspace
+	Token      string
+	User       model.User
+	Workspace  *model.Workspace
 	Workspaces []model.Workspace
 }
 
@@ -334,8 +335,8 @@ func (s *AuthService) IssueInvites(ctx context.Context, actorID string, count in
 	if count < 1 {
 		count = 1
 	}
-	if count > 50 {
-		count = 50
+	if count > 200 {
+		count = 200
 	}
 	out := make([]model.IssuedInvite, 0, count)
 	for i := 0; i < count; i++ {
@@ -345,7 +346,11 @@ func (s *AuthService) IssueInvites(ctx context.Context, actorID string, count in
 		}
 		code := strings.ToUpper(hex.EncodeToString(raw))
 		prefix := code[:4]
-		inv, err := s.invites.Insert(ctx, repository.HashInviteCode(code), prefix, actorID)
+		enc, err := cryptoutil.Encrypt(code, s.totpKey)
+		if err != nil {
+			return nil, err
+		}
+		inv, err := s.invites.Insert(ctx, repository.HashInviteCode(code), prefix, enc, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -355,8 +360,51 @@ func (s *AuthService) IssueInvites(ctx context.Context, actorID string, count in
 	return out, nil
 }
 
-func (s *AuthService) ListInvites(ctx context.Context, status string, limit, offset int) ([]model.Invite, int, error) {
-	return s.invites.List(ctx, status, limit, offset)
+func (s *AuthService) ListInvites(ctx context.Context, f repository.InviteListFilter) ([]model.Invite, int, error) {
+	invites, total, err := s.invites.List(ctx, f)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range invites {
+		if invites[i].CodeEncrypted == "" {
+			continue
+		}
+		code, err := cryptoutil.Decrypt(invites[i].CodeEncrypted, s.totpKey)
+		if err != nil {
+			continue
+		}
+		invites[i].Code = code
+		invites[i].CodeEncrypted = ""
+	}
+	return invites, total, nil
+}
+
+func (s *AuthService) DeleteInvites(ctx context.Context, actorID string, ids []string) (int64, error) {
+	clean := make([]string, 0, len(ids))
+	seen := map[string]struct{}{}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || !uuidPattern.MatchString(id) {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		clean = append(clean, id)
+	}
+	if len(clean) == 0 {
+		return 0, ErrInvalidInput
+	}
+	if len(clean) > 500 {
+		clean = clean[:500]
+	}
+	n, err := s.invites.DeleteIDs(ctx, clean)
+	if err != nil {
+		return 0, err
+	}
+	s.audit.Write(ctx, actorID, "auth.invite.delete", fmt.Sprintf("count=%d", n))
+	return n, nil
 }
 
 func (s *AuthService) RevokeInvite(ctx context.Context, actorID, id string) error {

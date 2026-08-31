@@ -19,9 +19,9 @@ type User struct {
 
 type UserRecord struct {
 	User
-	PasswordHash         string
-	TotpSecretEncrypted  string
-	TotpEnabledAt        *time.Time
+	PasswordHash        string
+	TotpSecretEncrypted string
+	TotpEnabledAt       *time.Time
 }
 
 type Workspace struct {
@@ -36,12 +36,15 @@ type Workspace struct {
 type Invite struct {
 	ID            string     `json:"id"`
 	CodePrefix    string     `json:"code_prefix"`
+	Code          string     `json:"code,omitempty"`
 	Status        string     `json:"status"`
 	CreatedBy     *string    `json:"created_by_user_id,omitempty"`
 	UsedBy        *string    `json:"used_by_user_id,omitempty"`
+	UsedByEmail   *string    `json:"used_by_email,omitempty"`
 	UsedAt        *time.Time `json:"used_at,omitempty"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
+	CodeEncrypted string     `json:"-"`
 }
 
 type IssuedInvite struct {

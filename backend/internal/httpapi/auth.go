@@ -93,10 +93,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"user":              user,
-			"workspace":         ws,
-			"active_workspace":  ws,
-			"workspaces":        workspaces,
+			"user":             user,
+			"workspace":        ws,
+			"active_workspace": ws,
+			"workspaces":       workspaces,
 		},
 	})
 }
@@ -199,13 +199,35 @@ func (h *AuthHandler) AdminIssueInvites(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *AuthHandler) AdminListInvites(w http.ResponseWriter, r *http.Request) {
-	status := r.URL.Query().Get("status")
-	invites, total, err := h.auth.ListInvites(r.Context(), status, 50, 0)
+	q := r.URL.Query()
+	f, err := parseInviteListFilter(q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "Проверьте параметры фильтра")
+		return
+	}
+	invites, total, err := h.auth.ListInvites(r.Context(), f)
 	if err != nil {
 		writeAuthError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"invites": invites, "total": total}})
+}
+
+func (h *AuthHandler) AdminDeleteInvites(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authn.UserID(r.Context())
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "Проверьте введённые данные")
+		return
+	}
+	n, err := h.auth.DeleteInvites(r.Context(), actor, req.IDs)
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"deleted": n}})
 }
 
 func (h *AuthHandler) AdminRevokeInvite(w http.ResponseWriter, r *http.Request) {

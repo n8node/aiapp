@@ -59,6 +59,7 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/admin/users/{userID}/block", authH.AdminBlockUser)
 					r.Get("/admin/invites", authH.AdminListInvites)
 					r.Post("/admin/invites", authH.AdminIssueInvites)
+					r.Post("/admin/invites/delete", authH.AdminDeleteInvites)
 					r.Post("/admin/invites/{inviteID}/revoke", authH.AdminRevokeInvite)
 					r.Get("/admin/auth-domains", authH.AdminGetDomains)
 					r.Put("/admin/auth-domains", authH.AdminSetDomains)

@@ -40,6 +40,18 @@ export type Invite = {
   code?: string;
   created_at: string;
   used_at?: string | null;
+  used_by_email?: string | null;
+};
+
+export type InviteListQuery = {
+  status?: string;
+  created_from?: string;
+  created_to?: string;
+  used_from?: string;
+  used_to?: string;
+  used_email?: string;
+  limit?: number;
+  offset?: number;
 };
 
 async function parse(res: Response) {
@@ -129,8 +141,20 @@ export function setAdminUserBlocked(userID: string, isBlocked: boolean) {
   });
 }
 
-export function fetchAdminInvites() {
-  return apiFetch<{ data: { invites: Invite[]; total: number } }>("/admin/invites");
+export function fetchAdminInvites(query: InviteListQuery = {}) {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.created_from) params.set("created_from", query.created_from);
+  if (query.created_to) params.set("created_to", query.created_to);
+  if (query.used_from) params.set("used_from", query.used_from);
+  if (query.used_to) params.set("used_to", query.used_to);
+  if (query.used_email) params.set("used_email", query.used_email);
+  if (query.limit) params.set("limit", String(query.limit));
+  if (query.offset) params.set("offset", String(query.offset));
+  const qs = params.toString();
+  return apiFetch<{ data: { invites: Invite[]; total: number } }>(
+    `/admin/invites${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export function issueAdminInvites(count: number) {
@@ -142,6 +166,13 @@ export function issueAdminInvites(count: number) {
 
 export function revokeAdminInvite(id: string) {
   return apiFetch(`/admin/invites/${id}/revoke`, { method: "POST" });
+}
+
+export function deleteAdminInvites(ids: string[]) {
+  return apiFetch<{ data: { deleted: number } }>("/admin/invites/delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
 }
 
 export function fetchAuthDomains() {

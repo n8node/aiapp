@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,13 +27,13 @@ func NewInviteRepository(pool *pgxpool.Pool) *InviteRepository {
 	return &InviteRepository{pool: pool}
 }
 
-func (r *InviteRepository) Insert(ctx context.Context, hash, prefix, createdBy string) (*model.Invite, error) {
+func (r *InviteRepository) Insert(ctx context.Context, hash, prefix, encrypted, createdBy string) (*model.Invite, error) {
 	var inv model.Invite
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO invites (code_hash, code_prefix, created_by_user_id)
-		VALUES ($1, $2, $3)
+		INSERT INTO invites (code_hash, code_prefix, code_encrypted, created_by_user_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, code_prefix, status, created_by_user_id, used_by_user_id, used_at, expires_at, created_at`,
-		hash, prefix, createdBy).Scan(
+		hash, prefix, encrypted, createdBy).Scan(
 		&inv.ID, &inv.CodePrefix, &inv.Status, &inv.CreatedBy, &inv.UsedBy, &inv.UsedAt, &inv.ExpiresAt, &inv.CreatedAt)
 	return &inv, err
 }
@@ -74,25 +76,74 @@ func (r *InviteRepository) Revoke(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *InviteRepository) List(ctx context.Context, status string, limit, offset int) ([]model.Invite, int, error) {
-	where := "1=1"
+type InviteListFilter struct {
+	Status      string
+	CreatedFrom *time.Time
+	CreatedTo   *time.Time
+	UsedFrom    *time.Time
+	UsedTo      *time.Time
+	UsedEmail   string
+	Limit       int
+	Offset      int
+}
+
+func (r *InviteRepository) List(ctx context.Context, f InviteListFilter) ([]model.Invite, int, error) {
+	if f.Limit <= 0 {
+		f.Limit = 100
+	}
+	if f.Limit > 500 {
+		f.Limit = 500
+	}
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+
+	where := []string{"1=1"}
 	args := []any{}
 	n := 1
-	if status != "" {
-		where = fmt.Sprintf("status = $%d", n)
-		args = append(args, status)
+	add := func(clause string, v any) {
+		where = append(where, fmt.Sprintf(clause, n))
+		args = append(args, v)
 		n++
 	}
+	if f.Status != "" {
+		add("i.status = $%d", f.Status)
+	}
+	if f.CreatedFrom != nil {
+		add("i.created_at >= $%d", *f.CreatedFrom)
+	}
+	if f.CreatedTo != nil {
+		add("i.created_at < $%d", *f.CreatedTo)
+	}
+	if f.UsedFrom != nil {
+		add("i.used_at IS NOT NULL AND i.used_at >= $%d", *f.UsedFrom)
+	}
+	if f.UsedTo != nil {
+		add("i.used_at IS NOT NULL AND i.used_at < $%d", *f.UsedTo)
+	}
+	if email := strings.TrimSpace(f.UsedEmail); email != "" {
+		add("u.email ILIKE $%d", "%"+email+"%")
+	}
+	clause := strings.Join(where, " AND ")
+
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM invites WHERE `+where, args...).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM invites i
+		LEFT JOIN users u ON u.id = i.used_by_user_id
+		WHERE `+clause, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+
 	limitI, offsetI := n, n+1
-	args = append(args, limit, offset)
+	args = append(args, f.Limit, f.Offset)
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, code_prefix, status, created_by_user_id, used_by_user_id, used_at, expires_at, created_at
-		FROM invites WHERE `+where+`
-		ORDER BY created_at DESC
+		SELECT i.id, i.code_prefix, i.code_encrypted, i.status, i.created_by_user_id,
+		       i.used_by_user_id, i.used_at, i.expires_at, i.created_at, u.email
+		FROM invites i
+		LEFT JOIN users u ON u.id = i.used_by_user_id
+		WHERE `+clause+`
+		ORDER BY i.created_at DESC
 		LIMIT $`+fmt.Sprint(limitI)+` OFFSET $`+fmt.Sprint(offsetI), args...)
 	if err != nil {
 		return nil, 0, err
@@ -101,12 +152,28 @@ func (r *InviteRepository) List(ctx context.Context, status string, limit, offse
 	var out []model.Invite
 	for rows.Next() {
 		var inv model.Invite
-		if err := rows.Scan(&inv.ID, &inv.CodePrefix, &inv.Status, &inv.CreatedBy, &inv.UsedBy, &inv.UsedAt, &inv.ExpiresAt, &inv.CreatedAt); err != nil {
+		var usedEmail *string
+		if err := rows.Scan(
+			&inv.ID, &inv.CodePrefix, &inv.CodeEncrypted, &inv.Status, &inv.CreatedBy,
+			&inv.UsedBy, &inv.UsedAt, &inv.ExpiresAt, &inv.CreatedAt, &usedEmail,
+		); err != nil {
 			return nil, 0, err
 		}
+		inv.UsedByEmail = usedEmail
 		out = append(out, inv)
 	}
 	return out, total, rows.Err()
+}
+
+func (r *InviteRepository) DeleteIDs(ctx context.Context, ids []string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	tag, err := r.pool.Exec(ctx, `DELETE FROM invites WHERE id = ANY($1::uuid[])`, ids)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 type SettingsRepository struct {
