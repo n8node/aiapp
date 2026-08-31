@@ -79,6 +79,26 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusConflict, "department_mapped", "Этот отдел уже привязан к пространству"
 	case errors.Is(err, service.ErrInvalidStorageSettings):
 		return http.StatusBadRequest, "invalid_storage", "Проверьте настройки S3: endpoint, бакет и ключи доступа"
+	case errors.Is(err, service.ErrStorageNotConfigured):
+		return http.StatusBadRequest, "storage_not_configured", "Администратор ещё не подключил хранилище"
+	case errors.Is(err, service.ErrDiskNoWorkspace):
+		return http.StatusBadRequest, "no_workspace", "Сначала выберите пространство отдела"
+	case errors.Is(err, service.ErrDiskFileNotFound):
+		return http.StatusNotFound, "file_not_found", "Файл не найден"
+	case errors.Is(err, service.ErrDiskFolderNotFound):
+		return http.StatusNotFound, "folder_not_found", "Папка не найдена"
+	case errors.Is(err, service.ErrDiskFileTooLarge):
+		return http.StatusRequestEntityTooLarge, "file_too_large", "Файл слишком большой"
+	case errors.Is(err, service.ErrDiskEmptyFile):
+		return http.StatusBadRequest, "empty_file", "Пустой файл загружать нельзя"
+	case errors.Is(err, service.ErrDiskTypeRejected):
+		return http.StatusBadRequest, "file_type", "Этот тип файла не принимается"
+	case errors.Is(err, service.ErrDiskInvalidMove):
+		return http.StatusBadRequest, "invalid_move", "Нельзя переместить папку саму в себя"
+	case errors.Is(err, service.ErrDiskNameTaken):
+		return http.StatusConflict, "name_taken", "Папка с таким именем уже есть"
+	case errors.Is(err, service.ErrDiskUploadSession):
+		return http.StatusBadRequest, "upload_session", "Загрузка не завершена. Повторите попытку."
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

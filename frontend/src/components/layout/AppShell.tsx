@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { HardDrive, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
 import { logout, switchWorkspace, type User, type Workspace } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const nav = [
   { href: "/dashboard", label: "Обзор", icon: LayoutDashboard },
+  { href: "/files", label: "Файлы", icon: HardDrive },
   { href: "/settings", label: "Настройки", icon: Settings },
 ];
 

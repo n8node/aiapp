@@ -23,7 +23,7 @@ func TestRateLimiterAllowsThenBlocks(t *testing.T) {
 func TestLimitAuthLogin(t *testing.T) {
 	login := newRateLimiter(time.Minute, 1)
 	reg := newRateLimiter(time.Minute, 5)
-	h := limitAuth(login, reg)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := limitAuth(login, reg, newRateLimiter(time.Minute, 40))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)

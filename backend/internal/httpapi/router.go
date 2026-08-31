@@ -19,6 +19,7 @@ type Dependencies struct {
 	Bitrix     *service.BitrixService
 	Workspaces *service.WorkspaceService
 	Storage    *service.StorageSettingsService
+	Disk       *service.DiskService
 	Tokens     *authn.JWT
 }
 
@@ -29,6 +30,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	bitrixH := NewBitrixHandler(deps.Bitrix, deps.Workspaces)
 	workspaceH := NewWorkspaceHandler(deps.Workspaces)
 	storageH := NewStorageHandler(deps.Storage)
+	diskH := NewDiskHandler(deps.Disk)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -38,7 +40,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(cors(deps.Config.CORSOrigins))
 	r.Use(csrfOrigin(deps.Config.CORSOrigins))
 	r.Use(securityHeaders)
-	r.Use(limitAuth(newRateLimiter(15*time.Minute, 20), newRateLimiter(15*time.Minute, 10)))
+	r.Use(limitAuth(newRateLimiter(15*time.Minute, 20), newRateLimiter(15*time.Minute, 10), newRateLimiter(15*time.Minute, 40)))
 
 	r.Get("/live", health.Live)
 	r.Get("/ready", health.Ready)
@@ -60,6 +62,25 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(requireTotp(deps.Auth))
 				r.Put("/auth/workspace", authH.SwitchWorkspace)
+				r.Get("/disk/files", diskH.ListFiles)
+				r.Post("/disk/files/upload/init", diskH.UploadInit)
+				r.Post("/disk/files/upload/complete", diskH.UploadComplete)
+				r.Post("/disk/files/bulk", diskH.BulkFiles)
+				r.Get("/disk/files/{fileID}", diskH.GetFile)
+				r.Patch("/disk/files/{fileID}", diskH.PatchFile)
+				r.Delete("/disk/files/{fileID}", diskH.DeleteFile)
+				r.Post("/disk/files/{fileID}/copy", diskH.CopyFile)
+				r.Get("/disk/files/{fileID}/download", diskH.Download)
+				r.Get("/disk/folders", diskH.ListFolders)
+				r.Post("/disk/folders", diskH.CreateFolder)
+				r.Post("/disk/folders/bulk", diskH.BulkFolders)
+				r.Get("/disk/folders/{folderID}/breadcrumbs", diskH.Breadcrumbs)
+				r.Patch("/disk/folders/{folderID}", diskH.PatchFolder)
+				r.Delete("/disk/folders/{folderID}", diskH.DeleteFolder)
+				r.Get("/disk/trash", diskH.ListTrash)
+				r.Post("/disk/trash/restore", diskH.RestoreTrash)
+				r.Post("/disk/trash/empty", diskH.EmptyTrash)
+				r.Delete("/disk/trash/{id}", diskH.PermanentDelete)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)

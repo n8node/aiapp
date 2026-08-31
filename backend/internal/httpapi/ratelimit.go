@@ -51,7 +51,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-func limitAuth(login, register *rateLimiter) func(http.Handler) http.Handler {
+func limitAuth(login, register, upload *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
@@ -68,6 +68,11 @@ func limitAuth(login, register *rateLimiter) func(http.Handler) http.Handler {
 			case "/api/v1/auth/register", "/api/v1/auth/invite/verify":
 				if !register.allow(ip) {
 					writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много попыток, подождите")
+					return
+				}
+			case "/api/v1/disk/files/upload/init":
+				if !upload.allow(ip) {
+					writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много загрузок, подождите")
 					return
 				}
 			}
