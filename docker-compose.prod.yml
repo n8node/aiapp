@@ -1,0 +1,65 @@
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+      - ./nginx/conf.d/default-prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - ./nginx/snippets/rigintel-locations.conf:/etc/nginx/snippets/rigintel-locations.conf:ro
+      - ./nginx/snippets/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    environment:
+      ENVIRONMENT: production
+      PUBLIC_APP_URL: https://rigintel.ai/app
+      CORS_ORIGINS: https://rigintel.ai,https://www.rigintel.ai
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: /app/api/v1
+        NEXT_PUBLIC_APP_NAME: RigIntel
+        NEXT_PUBLIC_SITE_URL: https://rigintel.ai
+    environment:
+      NEXT_PUBLIC_API_URL: /app/api/v1
+      NEXT_PUBLIC_APP_NAME: RigIntel
+      NEXT_PUBLIC_SITE_URL: https://rigintel.ai
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  wordpress:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mysql:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

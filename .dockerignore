@@ -1,0 +1,9 @@
+.git
+**/.git
+**/.cursor
+**/node_modules
+**/.next
+**/*.md
+.env
+.env.*
+nginx/ssl/*.pem
