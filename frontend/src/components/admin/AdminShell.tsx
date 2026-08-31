@@ -14,6 +14,7 @@ const nav = [
       { href: "/admin/auth-settings", label: "Домены почты" },
       { href: "/admin/bitrix", label: "Битрикс24" },
       { href: "/admin/workspaces", label: "Пространства" },
+      { href: "/admin/storage-settings", label: "S3 — хранилище" },
     ],
   },
 ];

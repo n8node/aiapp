@@ -52,6 +52,8 @@ func main() {
 	bitrixStore := repository.NewBitrixRepository(handle)
 	bitrixSvc := service.NewBitrixService(settings, bitrixStore, audit, cfg.TOTPKey)
 	workspaceSvc := service.NewWorkspaceService(workspaces, users, bitrixStore, audit)
+	storageRepo := repository.NewStorageSettingsRepository(handle)
+	storageSvc := service.NewStorageSettingsService(storageRepo, audit, cfg, cfg.TOTPKey)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
 		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
@@ -66,7 +68,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

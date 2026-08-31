@@ -18,6 +18,7 @@ type Dependencies struct {
 	Auth       *service.AuthService
 	Bitrix     *service.BitrixService
 	Workspaces *service.WorkspaceService
+	Storage    *service.StorageSettingsService
 	Tokens     *authn.JWT
 }
 
@@ -27,6 +28,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	authH := NewAuthHandler(deps.Auth, deps.Tokens)
 	bitrixH := NewBitrixHandler(deps.Bitrix, deps.Workspaces)
 	workspaceH := NewWorkspaceHandler(deps.Workspaces)
+	storageH := NewStorageHandler(deps.Storage)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -79,6 +81,9 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/admin/workspaces/apply", workspaceH.Apply)
 					r.Post("/admin/workspaces/{workspaceID}/bitrix", workspaceH.LinkDepartment)
 					r.Delete("/admin/workspaces/{workspaceID}/bitrix/{deptID}", workspaceH.UnlinkDepartment)
+					r.Get("/admin/storage-settings", storageH.Get)
+					r.Put("/admin/storage-settings", storageH.Save)
+					r.Post("/admin/storage-settings/test", storageH.Test)
 				})
 			})
 		})

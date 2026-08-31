@@ -77,6 +77,8 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusBadRequest, "department_unknown", "Сначала синхронизируйте отделы из Битрикс24"
 	case errors.Is(err, service.ErrDepartmentMapped):
 		return http.StatusConflict, "department_mapped", "Этот отдел уже привязан к пространству"
+	case errors.Is(err, service.ErrInvalidStorageSettings):
+		return http.StatusBadRequest, "invalid_storage", "Проверьте настройки S3: endpoint, бакет и ключи доступа"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}
