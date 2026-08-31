@@ -56,25 +56,59 @@ func (s *WorkspaceService) EnrichDepartments(ctx context.Context, deps []model.B
 	for _, l := range links {
 		byDept[l.BitrixDepartmentID] = l
 	}
+	nameByID := map[int64]string{}
+	parentOf := map[int64]*int64{}
+	for _, d := range deps {
+		nameByID[d.BitrixID] = d.Name
+		parentOf[d.BitrixID] = d.ParentBitrixID
+	}
 	nameByWS := map[string]string{}
 	for _, l := range links {
 		nameByWS[l.WorkspaceID] = l.WorkspaceName
 	}
 	for i := range deps {
+		if link, ok := byDept[deps[i].BitrixID]; ok {
+			wsID := link.WorkspaceID
+			deps[i].WorkspaceID = &wsID
+			if link.WorkspaceName != "" {
+				name := link.WorkspaceName
+				deps[i].WorkspaceName = &name
+			}
+			inc := link.IncludeDescendants
+			deps[i].IncludeDescendants = &inc
+			continue
+		}
 		wsID, ok := coverage[deps[i].BitrixID]
 		if !ok {
 			continue
 		}
 		deps[i].WorkspaceID = &wsID
+		deps[i].WorkspaceInherited = true
 		if name := nameByWS[wsID]; name != "" {
 			deps[i].WorkspaceName = &name
 		}
-		if link, ok := byDept[deps[i].BitrixID]; ok {
-			inc := link.IncludeDescendants
-			deps[i].IncludeDescendants = &inc
-		}
+		deps[i].InheritedFrom = ancestorLinkName(deps[i].BitrixID, parentOf, byDept, nameByID)
 	}
 	return deps, nil
+}
+
+func ancestorLinkName(id int64, parent map[int64]*int64, links map[int64]model.WorkspaceBitrixLink, names map[int64]string) string {
+	seen := map[int64]struct{}{}
+	cur := parent[id]
+	for cur != nil {
+		if _, loop := seen[*cur]; loop {
+			break
+		}
+		seen[*cur] = struct{}{}
+		if _, ok := links[*cur]; ok {
+			if n := names[*cur]; n != "" {
+				return n
+			}
+			return "родительский отдел"
+		}
+		cur = parent[*cur]
+	}
+	return ""
 }
 
 func (s *WorkspaceService) CreateFromDepartment(ctx context.Context, actorID string, deptID int64, includeDescendants bool, name string) (*model.WorkspaceAdmin, error) {

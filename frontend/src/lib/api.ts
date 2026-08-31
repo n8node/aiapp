@@ -205,6 +205,8 @@ export type BitrixDepartment = {
   head_bitrix_id?: number | null;
   workspace_id?: string | null;
   workspace_name?: string | null;
+  workspace_inherited?: boolean;
+  inherited_from?: string;
   include_descendants?: boolean | null;
 };
 
@@ -305,5 +307,15 @@ export function applyWorkspaceMemberships() {
 export function unlinkWorkspaceDepartment(workspaceID: string, deptID: number) {
   return apiFetch<{ data: { ok: boolean } }>(`/admin/workspaces/${workspaceID}/bitrix/${deptID}`, {
     method: "DELETE",
+  });
+}
+
+export function linkWorkspaceDepartment(workspaceID: string, deptID: number, includeDescendants: boolean) {
+  return apiFetch<{ data: AdminWorkspace }>(`/admin/workspaces/${workspaceID}/bitrix`, {
+    method: "POST",
+    body: JSON.stringify({
+      bitrix_department_id: deptID,
+      include_descendants: includeDescendants,
+    }),
   });
 }

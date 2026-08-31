@@ -8,9 +8,11 @@ import {
   fetchBitrixDepartments,
   fetchBitrixStatus,
   fetchBitrixUsers,
+  linkWorkspaceDepartment,
   saveBitrixWebhook,
   syncBitrix,
   testBitrix,
+  unlinkWorkspaceDepartment,
   type BitrixDepartment,
   type BitrixStatus,
   type BitrixUser,
@@ -151,6 +153,35 @@ export function AdminBitrixPage() {
     }
   }
 
+  async function stopIncludingChildren(dept: BitrixDepartment) {
+    if (!dept.workspace_id) return;
+    setError(null);
+    setBusy("workspace");
+    try {
+      await linkWorkspaceDepartment(dept.workspace_id, dept.bitrix_id, false);
+      setNotice("Подотделы больше не входят в это пространство — им можно создать свои");
+      await loadSnapshot(userQ);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось изменить привязку");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function unlink(dept: BitrixDepartment) {
+    if (!dept.workspace_id) return;
+    setError(null);
+    setBusy("workspace");
+    try {
+      await unlinkWorkspaceDepartment(dept.workspace_id, dept.bitrix_id);
+      await loadSnapshot(userQ);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось отвязать отдел");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -285,15 +316,21 @@ export function AdminBitrixPage() {
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
-          <h2 className="text-base font-semibold">Отделы из Битрикс</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
+          <div>
+            <h2 className="text-base font-semibold">Отделы из Битрикс</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Корневой отдел с галкой «подотделы» накрывает всех, у кого нет своего
+              пространства. Это наследование, не отдельные пространства.
+            </p>
+          </div>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input
               type="checkbox"
               checked={includeChildren}
               onChange={(e) => setIncludeChildren(e.target.checked)}
             />
-            Включать подотделы
+            Включать подотделы при создании
           </label>
         </div>
         <div className="overflow-x-auto">
@@ -321,22 +358,52 @@ export function AdminBitrixPage() {
                       {d.parent_bitrix_id ? namesById.get(d.parent_bitrix_id) || d.parent_bitrix_id : "—"}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {d.workspace_name || "—"}
-                      {d.workspace_id && d.include_descendants ? (
-                        <span className="ml-1 text-xs text-slate-400">+ подотделы</span>
-                      ) : null}
+                      {d.workspace_inherited ? (
+                        <span className="text-slate-500">
+                          через {d.inherited_from || d.workspace_name}
+                        </span>
+                      ) : (
+                        <>
+                          {d.workspace_name || "—"}
+                          {d.include_descendants ? (
+                            <span className="ml-1 text-xs text-slate-400">+ подотделы</span>
+                          ) : null}
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {d.workspace_id ? null : (
-                        <button
-                          type="button"
-                          disabled={busy !== null}
-                          onClick={() => void createWorkspace(d)}
-                          className="text-sm text-blue-700 hover:underline disabled:opacity-40"
-                        >
-                          Создать пространство
-                        </button>
-                      )}
+                      <div className="flex flex-wrap justify-end gap-3">
+                        {d.workspace_id && !d.workspace_inherited && d.include_descendants ? (
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void stopIncludingChildren(d)}
+                            className="text-sm text-slate-500 hover:text-slate-800 disabled:opacity-40"
+                          >
+                            Без подотделов
+                          </button>
+                        ) : null}
+                        {d.workspace_id && !d.workspace_inherited ? (
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void unlink(d)}
+                            className="text-sm text-slate-500 hover:text-slate-800 disabled:opacity-40"
+                          >
+                            Отвязать
+                          </button>
+                        ) : null}
+                        {!d.workspace_id || d.workspace_inherited ? (
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void createWorkspace(d)}
+                            className="text-sm text-blue-700 hover:underline disabled:opacity-40"
+                          >
+                            Создать пространство
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))

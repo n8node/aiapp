@@ -21,6 +21,8 @@ type BitrixDepartment struct {
 	HeadBitrixID       *int64  `json:"head_bitrix_id,omitempty"`
 	WorkspaceID        *string `json:"workspace_id,omitempty"`
 	WorkspaceName      *string `json:"workspace_name,omitempty"`
+	WorkspaceInherited bool    `json:"workspace_inherited"`
+	InheritedFrom      string  `json:"inherited_from,omitempty"`
 	IncludeDescendants *bool   `json:"include_descendants,omitempty"`
 }
 
