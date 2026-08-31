@@ -8,9 +8,7 @@ services:
       - ./nginx/certbot/www:/var/www/certbot:ro
       - ./nginx/conf.d/default-prod.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
-      - ./nginx/snippets/rigintel-locations.conf:/etc/nginx/snippets/rigintel-locations.conf:ro
-      - ./nginx/snippets/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
-      - ./nginx/snippets/unsloth-proxy.conf:/etc/nginx/snippets/unsloth-proxy.conf:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
     logging:
       driver: json-file
       options:
