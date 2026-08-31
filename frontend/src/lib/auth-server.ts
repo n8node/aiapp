@@ -1,5 +1,12 @@
 import { cookies } from "next/headers";
 
+export type ServerWorkspace = {
+  id: string;
+  name: string;
+  slug: string;
+  role?: string;
+};
+
 export type ServerMe = {
   user: {
     id: string;
@@ -8,6 +15,8 @@ export type ServerMe = {
     is_platform_admin: boolean;
     totp_enabled: boolean;
   };
+  workspace: ServerWorkspace | null;
+  workspaces: ServerWorkspace[];
 };
 
 export async function getMe(): Promise<ServerMe | null> {
@@ -22,5 +31,11 @@ export async function getMe(): Promise<ServerMe | null> {
   });
   if (!res.ok) return null;
   const body = (await res.json()) as { data?: ServerMe };
-  return body.data ?? null;
+  const data = body.data;
+  if (!data?.user) return null;
+  return {
+    user: data.user,
+    workspace: data.workspace ?? null,
+    workspaces: data.workspaces ?? [],
+  };
 }

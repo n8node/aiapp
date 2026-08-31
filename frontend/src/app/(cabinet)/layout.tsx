@@ -22,6 +22,8 @@ export default async function CabinetLayout({
         totp_enabled: me.user.totp_enabled,
         created_at: "",
       }}
+      workspace={me.workspace}
+      workspaces={me.workspaces}
     >
       {children}
     </AppShell>

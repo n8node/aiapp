@@ -171,7 +171,7 @@ func (s *AuthService) Register(ctx context.Context, email, pass, name, inviteCod
 		return nil, err
 	}
 	s.audit.Write(ctx, user.ID, "auth.register", user.Email)
-	return s.issue(ctx, &user.User, ws)
+	return s.issue(ctx, &user.User, []model.Workspace{*ws}, ws)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, pass, totpCode string) (*AuthResult, error) {
@@ -210,26 +210,53 @@ func (s *AuthService) Login(ctx context.Context, email, pass, totpCode string) (
 	if err != nil {
 		return nil, err
 	}
-	var ws *model.Workspace
-	if len(list) > 0 {
-		ws = &list[0]
-	}
-	return s.issue(ctx, &user.User, ws)
+	return s.issue(ctx, &user.User, list, pickWorkspace(list, ""))
 }
 
-func (s *AuthService) Me(ctx context.Context, userID string) (*model.User, []model.Workspace, error) {
+func (s *AuthService) Me(ctx context.Context, userID, sessionID string) (*model.User, []model.Workspace, *model.Workspace, error) {
 	user, err := s.users.GetByID(ctx, userID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if user.IsBlocked {
-		return nil, nil, ErrUserBlocked
+		return nil, nil, nil, ErrUserBlocked
 	}
 	list, err := s.workspaces.ListForUser(ctx, user.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return &user.User, list, nil
+	saved, err := s.sessions.ActiveWorkspace(ctx, sessionID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	active := pickWorkspace(list, saved)
+	if active != nil && saved != active.ID {
+		_ = s.sessions.SetActiveWorkspace(ctx, sessionID, active.ID)
+	}
+	return &user.User, list, active, nil
+}
+
+func (s *AuthService) SwitchWorkspace(ctx context.Context, userID, sessionID, workspaceID string) (*model.Workspace, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" {
+		return nil, ErrInvalidInput
+	}
+	if _, err := s.RequireSession(ctx, userID, sessionID); err != nil {
+		return nil, err
+	}
+	list, err := s.workspaces.ListForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	active := pickWorkspace(list, workspaceID)
+	if active == nil || active.ID != workspaceID {
+		return nil, ErrForbidden
+	}
+	if err := s.sessions.SetActiveWorkspace(ctx, sessionID, active.ID); err != nil {
+		return nil, err
+	}
+	s.audit.Write(ctx, userID, "workspace.switch", active.ID)
+	return active, nil
 }
 
 func (s *AuthService) RequireUser(ctx context.Context, userID string) (*model.UserRecord, error) {
@@ -483,20 +510,36 @@ func (s *AuthService) EnsureSuperAdmin(ctx context.Context, email, pass, name st
 	return &user.User, true, nil
 }
 
-func (s *AuthService) issue(ctx context.Context, user *model.User, ws *model.Workspace) (*AuthResult, error) {
+func (s *AuthService) issue(ctx context.Context, user *model.User, list []model.Workspace, ws *model.Workspace) (*AuthResult, error) {
 	sid, err := s.sessions.Create(ctx, user.ID)
 	if err != nil {
 		return nil, err
+	}
+	if ws != nil {
+		_ = s.sessions.SetActiveWorkspace(ctx, sid, ws.ID)
 	}
 	token, err := s.tokens.Issue(user.ID, sid, tokenTTL)
 	if err != nil {
 		return nil, err
 	}
-	list := []model.Workspace{}
-	if ws != nil {
-		list = []model.Workspace{*ws}
+	if list == nil {
+		list = []model.Workspace{}
 	}
 	return &AuthResult{Token: token, User: *user, Workspace: ws, Workspaces: list}, nil
+}
+
+func pickWorkspace(list []model.Workspace, wantID string) *model.Workspace {
+	if wantID != "" {
+		for i := range list {
+			if list[i].ID == wantID {
+				return &list[i]
+			}
+		}
+	}
+	if len(list) == 0 {
+		return nil
+	}
+	return &list[0]
 }
 
 func slugFromEmail(email string) string {

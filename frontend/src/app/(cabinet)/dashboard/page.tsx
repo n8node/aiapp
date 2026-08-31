@@ -1,11 +1,29 @@
-export default function DashboardPage() {
+import { getMe } from "@/lib/auth-server";
+
+function roleLabel(role?: string) {
+  if (role === "department_manager") return "Руководитель отдела";
+  if (role === "employee") return "Сотрудник";
+  return role || "";
+}
+
+export default async function DashboardPage() {
+  const me = await getMe();
+  const ws = me?.workspace;
+
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Обзор</h1>
-      <p className="mt-2 text-sm text-muted">
-        Кабинет готов. Чат по базе знаний и сверка документов появятся на
-        следующих этапах.
-      </p>
+      {ws ? (
+        <p className="mt-2 text-sm text-muted">
+          Сейчас открыто пространство <span className="font-medium text-text">{ws.name}</span>
+          {ws.role ? ` · ${roleLabel(ws.role)}` : ""}. Чат по базе знаний и сверка
+          документов появятся на следующих этапах.
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-muted">
+          Кабинет готов. Пространство ещё не назначено.
+        </p>
+      )}
     </div>
   );
 }

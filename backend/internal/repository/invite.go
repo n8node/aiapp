@@ -240,6 +240,26 @@ func (r *SessionRepository) IsActive(ctx context.Context, id, userID string) (bo
 	return ok, err
 }
 
+func (r *SessionRepository) ActiveWorkspace(ctx context.Context, sessionID string) (string, error) {
+	var id *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT active_workspace_id FROM sessions WHERE id = $1 AND revoked_at IS NULL`, sessionID).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	if id == nil {
+		return "", nil
+	}
+	return *id, nil
+}
+
+func (r *SessionRepository) SetActiveWorkspace(ctx context.Context, sessionID, workspaceID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE sessions SET active_workspace_id = $2, last_active_at = NOW()
+		WHERE id = $1 AND revoked_at IS NULL`, sessionID, workspaceID)
+	return err
+}
+
 type AuditRepository struct {
 	pool *pgxpool.Pool
 }

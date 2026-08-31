@@ -237,7 +237,11 @@ func (r *WorkspaceRepository) ListForUser(ctx context.Context, userID string) ([
 		FROM workspaces w
 		JOIN workspace_members m ON m.workspace_id = w.id
 		WHERE m.user_id = $1
-		ORDER BY w.created_at`, userID)
+		ORDER BY
+			CASE WHEN EXISTS (
+				SELECT 1 FROM workspace_bitrix_departments l WHERE l.workspace_id = w.id
+			) THEN 0 ELSE 1 END,
+			w.name`, userID)
 	if err != nil {
 		return nil, err
 	}

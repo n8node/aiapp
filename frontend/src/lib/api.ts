@@ -101,6 +101,13 @@ export function fetchMe() {
   return apiFetch<{ data: MeData }>("/auth/me");
 }
 
+export function switchWorkspace(workspaceID: string) {
+  return apiFetch<{ data: { workspace: Workspace } }>("/auth/workspace", {
+    method: "PUT",
+    body: JSON.stringify({ workspace_id: workspaceID }),
+  });
+}
+
 export function verifyInvite(inviteCode: string) {
   return apiFetch("/auth/invite/verify", {
     method: "POST",

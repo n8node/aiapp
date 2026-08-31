@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
-import { logout, type User } from "@/lib/api";
+import { logout, switchWorkspace, type User, type Workspace } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const nav = [
@@ -12,7 +12,17 @@ const nav = [
   { href: "/settings", label: "Настройки", icon: Settings },
 ];
 
-export function AppShell({ user, children }: { user: User; children: React.ReactNode }) {
+export function AppShell({
+  user,
+  workspace,
+  workspaces = [],
+  children,
+}: {
+  user: User;
+  workspace?: Workspace | null;
+  workspaces?: Workspace[];
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -20,6 +30,12 @@ export function AppShell({ user, children }: { user: User; children: React.React
   async function handleLogout() {
     await logout();
     router.push("/auth/login");
+    router.refresh();
+  }
+
+  async function handleWorkspace(id: string) {
+    if (!id || id === workspace?.id) return;
+    await switchWorkspace(id);
     router.refresh();
   }
 
@@ -46,6 +62,24 @@ export function AppShell({ user, children }: { user: User; children: React.React
             {collapsed ? "»" : "«"}
           </button>
         </div>
+        {workspaces.length > 0 && !collapsed ? (
+          <div className="border-b border-border px-3 py-3">
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              Пространство
+            </label>
+            <select
+              value={workspace?.id ?? ""}
+              onChange={(e) => void handleWorkspace(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface px-2.5 py-2 text-sm"
+            >
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <nav className="flex flex-1 flex-col gap-1 p-2">
           {nav.map((item) => {
             const Icon = item.icon;

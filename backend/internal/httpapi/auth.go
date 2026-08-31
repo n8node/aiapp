@@ -82,23 +82,38 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Не авторизован")
 		return
 	}
-	user, workspaces, err := h.auth.Me(r.Context(), userID)
+	sessionID, _ := authn.SessionID(r.Context())
+	user, workspaces, active, err := h.auth.Me(r.Context(), userID, sessionID)
 	if err != nil {
 		writeAuthError(w, err)
 		return
 	}
-	var ws any
-	if len(workspaces) > 0 {
-		ws = workspaces[0]
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"user":             user,
-			"workspace":        ws,
-			"active_workspace": ws,
+			"workspace":        active,
+			"active_workspace": active,
 			"workspaces":       workspaces,
 		},
 	})
+}
+
+func (h *AuthHandler) SwitchWorkspace(w http.ResponseWriter, r *http.Request) {
+	userID, _ := authn.UserID(r.Context())
+	sessionID, _ := authn.SessionID(r.Context())
+	var req struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "Проверьте введённые данные")
+		return
+	}
+	ws, err := h.auth.SwitchWorkspace(r.Context(), userID, sessionID, req.WorkspaceID)
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"workspace": ws}})
 }
 
 func (h *AuthHandler) VerifyInvite(w http.ResponseWriter, r *http.Request) {

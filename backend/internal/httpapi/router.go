@@ -57,6 +57,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(requireTotp(deps.Auth))
+				r.Put("/auth/workspace", authH.SwitchWorkspace)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)
