@@ -330,6 +330,7 @@ export function linkWorkspaceDepartment(workspaceID: string, deptID: number, inc
 export type StorageAdminView = {
   endpoint: string;
   bucket: string;
+  project_id?: string;
   region: string;
   access_key: string;
   secret_key_set: boolean;
@@ -345,6 +346,7 @@ export type StorageAdminView = {
 export type StorageAdminUpdateRequest = {
   endpoint: string;
   bucket: string;
+  project_id: string;
   region: string;
   access_key: string;
   secret_key?: string;

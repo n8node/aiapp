@@ -5,6 +5,7 @@ import "time"
 type StorageSettings struct {
 	Endpoint  string `json:"endpoint"`
 	Bucket    string `json:"bucket"`
+	ProjectID string `json:"project_id"`
 	Region    string `json:"region"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key"`
@@ -21,6 +22,7 @@ type StorageSettingsRecord struct {
 type StorageAdminView struct {
 	Endpoint      string    `json:"endpoint"`
 	Bucket        string    `json:"bucket"`
+	ProjectID     string    `json:"project_id"`
 	Region        string    `json:"region"`
 	AccessKey     string    `json:"access_key"`
 	SecretKeySet  bool      `json:"secret_key_set"`
@@ -36,6 +38,7 @@ type StorageAdminView struct {
 type StorageAdminUpdateRequest struct {
 	Endpoint  string `json:"endpoint"`
 	Bucket    string `json:"bucket"`
+	ProjectID string `json:"project_id"`
 	Region    string `json:"region"`
 	AccessKey string `json:"access_key"`
 	SecretKey string `json:"secret_key,omitempty"`

@@ -54,6 +54,23 @@ func TestValidateStorageSettings(t *testing.T) {
 	}
 }
 
+func TestBucketCandidates(t *testing.T) {
+	got := bucketCandidates("docs", "proj-1")
+	if len(got) != 2 || got[0] != "docs" || got[1] != "proj-1:docs" {
+		t.Fatalf("got %#v", got)
+	}
+	if got := bucketCandidates("proj-1:docs", "proj-1"); len(got) != 1 || got[0] != "proj-1:docs" {
+		t.Fatalf("prefixed %#v", got)
+	}
+}
+
+func TestBucketProbeMessageListsKnown(t *testing.T) {
+	msg := bucketProbeMessage("wrong", []string{"alpha", "beta"}, errBucketNotInList)
+	if !strings.Contains(msg, "alpha") || !strings.Contains(msg, "wrong") || strings.Contains(strings.ToLower(msg), "secret") {
+		t.Fatalf("msg=%s", msg)
+	}
+}
+
 func TestSanitizeS3ErrorHidesCredentials(t *testing.T) {
 	got := sanitizeS3Error(errString("SecretAccessKey is wrong"))
 	if strings.Contains(strings.ToLower(got), "secretaccesskey") {

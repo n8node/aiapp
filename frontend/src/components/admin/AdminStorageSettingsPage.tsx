@@ -90,6 +90,7 @@ export function AdminStorageSettingsPage() {
 
   const [endpoint, setEndpoint] = useState("");
   const [bucket, setBucket] = useState("");
+  const [projectID, setProjectID] = useState("");
   const [region, setRegion] = useState("ru-central1");
   const [accessKey, setAccessKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -104,6 +105,7 @@ export function AdminStorageSettingsPage() {
   const applyView = useCallback((data: StorageAdminView) => {
     setEndpoint(data.endpoint);
     setBucket(data.bucket);
+    setProjectID(data.project_id || "");
     setRegion(data.region || "ru-central1");
     setAccessKey(data.access_key);
     setSecretKeySet(data.secret_key_set);
@@ -135,6 +137,7 @@ export function AdminStorageSettingsPage() {
     return {
       endpoint: endpoint.trim(),
       bucket: bucket.trim(),
+      project_id: projectID.trim(),
       region: region.trim(),
       access_key: accessKey.trim(),
       use_ssl: useSSL,
@@ -172,7 +175,9 @@ export function AdminStorageSettingsPage() {
       const result = (await testAdminStorageConnection()).data;
       setTestOk(result.ok);
       setTestMessage(result.message);
-      if (result.ok) setEnabled(true);
+      if (result.ok) {
+        applyView((await fetchAdminStorageSettings()).data);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Не удалось проверить подключение");
     } finally {
@@ -193,7 +198,7 @@ export function AdminStorageSettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">S3 — хранилище</h1>
         <p className="mt-1 text-sm text-slate-500">
-          S3-совместимое хранилище для документов: MinIO, Beget, Yandex Cloud,
+          S3-совместимое хранилище для документов: MinIO, Beget, Reg.ru, Yandex Cloud,
           Selectel и другие. Секретный ключ хранится в зашифрованном виде.
         </p>
       </div>
@@ -214,9 +219,12 @@ export function AdminStorageSettingsPage() {
             type="text"
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
-            placeholder="https://s3.ru1.storage.beget.cloud"
+            placeholder="https://s3.regru.cloud"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Reg.ru: https://s3.regru.cloud. Beget: https://s3.ru1.storage.beget.cloud.
+          </p>
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium">Bucket</label>
@@ -224,9 +232,26 @@ export function AdminStorageSettingsPage() {
             type="text"
             value={bucket}
             onChange={(e) => setBucket(e.target.value)}
-            placeholder="rigintel-docs"
+            placeholder="имя-бакета"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Имя бакета из списка в панели, не Project ID.
+          </p>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Project ID</label>
+          <input
+            type="text"
+            value={projectID}
+            onChange={(e) => setProjectID(e.target.value)}
+            placeholder="необязательно, для Reg.ru"
+            autoComplete="off"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Reg.ru показывает Project ID рядом с ключами. Beget это поле не использует.
+          </p>
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium">Region</label>
@@ -234,9 +259,12 @@ export function AdminStorageSettingsPage() {
             type="text"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
-            placeholder="ru-central1"
+            placeholder="us-east-1"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Reg.ru и Ceph: us-east-1. Beget и Yandex: ru-central1.
+          </p>
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium">Access Key ID</label>
@@ -263,7 +291,7 @@ export function AdminStorageSettingsPage() {
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={pathStyle} onChange={(e) => setPathStyle(e.target.checked)} />
-            Path-style адресация
+            Path-style адресация (для Reg.ru включите)
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

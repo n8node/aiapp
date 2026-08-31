@@ -20,6 +20,7 @@ import (
 )
 
 var ErrInvalidStorageSettings = errors.New("invalid storage settings")
+var errBucketNotInList = errors.New("bucket not in list")
 
 type StorageSettingsService struct {
 	repo   *repository.StorageSettingsRepository
@@ -84,6 +85,7 @@ func (s *StorageSettingsService) Update(ctx context.Context, actorID string, req
 	cfg := rec.Config
 	cfg.Endpoint = strings.TrimSpace(req.Endpoint)
 	cfg.Bucket = strings.TrimSpace(req.Bucket)
+	cfg.ProjectID = strings.TrimSpace(req.ProjectID)
 	cfg.Region = strings.TrimSpace(req.Region)
 	cfg.AccessKey = strings.TrimSpace(req.AccessKey)
 	cfg.UseSSL = req.UseSSL
@@ -141,27 +143,29 @@ func (s *StorageSettingsService) TestConnection(ctx context.Context) (*model.Sto
 
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
-	_, err = client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(st.Bucket)})
+
+	candidates := bucketCandidates(st.Bucket, st.ProjectID)
+	working, known, err := probeS3Bucket(ctx, client, candidates)
 	if err != nil {
-		return &model.StorageTestResult{
-			OK:      false,
-			Message: "Не удалось подключиться к бакету: " + sanitizeS3Error(err),
-		}, nil
+		return &model.StorageTestResult{OK: false, Message: bucketProbeMessage(st.Bucket, known, err)}, nil
 	}
 
+	if working != "" && working != st.Bucket {
+		st.Bucket = working
+	}
 	if StorageConfigured(st) && !st.Enabled {
 		st.Enabled = true
-		enc, encErr := s.encryptSecret(st.SecretKey)
-		if encErr == nil {
-			saved := st
-			saved.SecretKey = enc
-			_, _ = s.repo.Update(ctx, saved)
-		}
+	}
+	enc, encErr := s.encryptSecret(st.SecretKey)
+	if encErr == nil {
+		saved := st
+		saved.SecretKey = enc
+		_, _ = s.repo.Update(ctx, saved)
 	}
 
 	return &model.StorageTestResult{
 		OK:      true,
-		Message: fmt.Sprintf("Соединение успешно. Бакет «%s» доступен.", st.Bucket),
+		Message: fmt.Sprintf("Соединение успешно. Бакет «%s» доступен.", working),
 	}, nil
 }
 
@@ -171,6 +175,7 @@ func (s *StorageSettingsService) buildAdminView(rec *model.StorageSettingsRecord
 	return &model.StorageAdminView{
 		Endpoint:      st.Endpoint,
 		Bucket:        st.Bucket,
+		ProjectID:     st.ProjectID,
 		Region:        st.Region,
 		AccessKey:     st.AccessKey,
 		SecretKeySet:  strings.TrimSpace(st.SecretKey) != "",
@@ -274,6 +279,9 @@ func newS3Client(st model.StorageSettings) (*s3.Client, error) {
 	return s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpoint)
 		o.UsePathStyle = st.PathStyle
+		// Ceph/Reg.ru/MinIO reject optional AWS checksum headers from newer SDKs.
+		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	}), nil
 }
 
@@ -342,6 +350,117 @@ func maskSecret(value string) string {
 		return "••••"
 	}
 	return v[:2] + "••••" + v[len(v)-2:]
+}
+
+func bucketCandidates(bucket, projectID string) []string {
+	b := strings.TrimSpace(bucket)
+	p := strings.TrimSpace(projectID)
+	var out []string
+	add := func(s string) {
+		if s == "" {
+			return
+		}
+		for _, existing := range out {
+			if existing == s {
+				return
+			}
+		}
+		out = append(out, s)
+	}
+	add(b)
+	if p != "" && !strings.Contains(b, ":") {
+		add(p + ":" + b)
+	}
+	return out
+}
+
+func bucketNameIn(names []string, want string) bool {
+	for _, name := range names {
+		if strings.EqualFold(strings.TrimSpace(name), strings.TrimSpace(want)) {
+			return true
+		}
+	}
+	return false
+}
+
+func formatKnownBuckets(names []string) string {
+	const max = 8
+	if len(names) == 0 {
+		return ""
+	}
+	shown := names
+	extra := 0
+	if len(shown) > max {
+		extra = len(shown) - max
+		shown = shown[:max]
+	}
+	msg := strings.Join(shown, ", ")
+	if extra > 0 {
+		msg += fmt.Sprintf(" и ещё %d", extra)
+	}
+	return msg
+}
+
+func isS3NotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "statuscode: 404") ||
+		strings.Contains(msg, "nosuchbucket") ||
+		strings.Contains(msg, "notfound")
+}
+
+func probeS3Bucket(ctx context.Context, client *s3.Client, names []string) (string, []string, error) {
+	var last error
+	for _, name := range names {
+		_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(name)})
+		if err == nil {
+			return name, nil, nil
+		}
+		last = err
+	}
+
+	listed, listErr := client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	var known []string
+	if listErr == nil {
+		for _, b := range listed.Buckets {
+			if n := aws.ToString(b.Name); n != "" {
+				known = append(known, n)
+			}
+		}
+		for _, name := range names {
+			if bucketNameIn(known, name) {
+				return name, known, nil
+			}
+		}
+		return "", known, errBucketNotInList
+	}
+
+	for _, name := range names {
+		_, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:  aws.String(name),
+			MaxKeys: aws.Int32(1),
+		})
+		if err == nil {
+			return name, known, nil
+		}
+		last = err
+	}
+	return "", known, last
+}
+
+func bucketProbeMessage(wanted string, known []string, err error) string {
+	if errors.Is(err, errBucketNotInList) {
+		if listed := formatKnownBuckets(known); listed != "" {
+			return fmt.Sprintf("Бакет «%s» не найден в этом ключе. Доступны: %s. Укажите имя бакета, не Project ID.", wanted, listed)
+		}
+		return fmt.Sprintf("Ключи приняты, но бакетов в аккаунте нет. Создайте бакет и укажите его имя, не Project ID.")
+	}
+	if isS3NotFound(err) {
+		return "Бакет не найден. Для Reg.ru укажите имя бакета из списка (не Project ID), включите path-style и при необходимости заполните Project ID."
+	}
+	return "Не удалось подключиться к бакету: " + sanitizeS3Error(err)
 }
 
 func StorageConfigured(st model.StorageSettings) bool {
