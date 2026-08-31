@@ -2,6 +2,7 @@ package service
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -27,5 +28,27 @@ func TestBrowserUploadHeadersDropsUnsafe(t *testing.T) {
 	}
 	if h["X-Amz-Date"] != "20260101T000000Z" {
 		t.Fatalf("x-amz-date %q", h["X-Amz-Date"])
+	}
+}
+
+func TestAllowInlineDisposition(t *testing.T) {
+	if !allowInlineDisposition("image/png", "a.png") || !allowInlineDisposition("application/pdf", "a.pdf") {
+		t.Fatal("safe types")
+	}
+	if allowInlineDisposition("application/zip", "a.zip") || allowInlineDisposition("text/html", "a.html") {
+		t.Fatal("unsafe types")
+	}
+}
+
+func TestContentDispositionForcesAttachment(t *testing.T) {
+	got := ContentDispositionHeader(true, "application/zip", "secret.zip")
+	if !strings.Contains(got, "attachment") || strings.Contains(got, "inline") {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestValidByteRange(t *testing.T) {
+	if !validByteRange("bytes=0-99") || validByteRange("bytes=0-1,2-3") || validByteRange("items=1") {
+		t.Fatal("range")
 	}
 }

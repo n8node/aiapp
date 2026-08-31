@@ -35,7 +35,6 @@ import {
   copyFile,
   createFolder,
   deleteFile,
-  downloadFile,
   emptyTrash,
   fetchFolderBreadcrumbs,
   formatBytes,
@@ -43,6 +42,7 @@ import {
   listFiles,
   listFolders,
   listTrash,
+  openFile,
   permanentDeleteTrash,
   renameFile,
   renameFolder,
@@ -313,8 +313,7 @@ export function FileManager({
   const handleDownloadSelected = async () => {
     const fileIds = [...selected].filter((id) => selectedKinds.get(id) === "file");
     for (const id of fileIds) {
-      const { url } = await downloadFile(id);
-      window.open(url, "_blank");
+      openFile(id, "attachment");
     }
   };
 
@@ -676,7 +675,7 @@ export function FileManager({
                     files={groupFiles}
                     mode={mediaGridMode}
                     selected={selected}
-                    onOpen={(f) => void downloadFile(f.id, "inline").then(({ url }) => window.open(url, "_blank"))}
+                    onOpen={(f) => openFile(f.id, "inline")}
                     onToggleSelect={(id) => toggleSelect(id, "file")}
                   />
                 ) : (
@@ -709,7 +708,7 @@ export function FileManager({
                               <button
                                 type="button"
                                 title="Скачать"
-                                onClick={() => void downloadFile(f.id).then(({ url }) => window.open(url, "_blank"))}
+                                onClick={() => openFile(f.id, "attachment")}
                                 className="rounded p-1.5 text-muted hover:bg-zinc-100"
                               >
                                 <Download className="h-4 w-4" />

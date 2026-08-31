@@ -78,10 +78,6 @@ type DiskTrashRestoreRequest struct {
 	FolderIDs []string `json:"folder_ids"`
 }
 
-type DiskDownloadResponse struct {
-	URL string `json:"url"`
-}
-
 type DiskBulkResult struct {
 	OK     int                 `json:"ok"`
 	Errors []DiskBulkItemError `json:"errors"`

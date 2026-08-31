@@ -1,4 +1,5 @@
 import { ApiError, apiFetch } from "@/lib/api";
+import { apiPath } from "@/lib/urls";
 
 export type WorkspaceFile = {
   id: string;
@@ -214,11 +215,14 @@ export function deleteFolder(id: string) {
   return diskData<{ ok: boolean }>(`/disk/folders/${id}`, { method: "DELETE" });
 }
 
-export function downloadFile(id: string, disposition: "inline" | "attachment" = "attachment") {
+export function fileContentURL(id: string, disposition: "inline" | "attachment" = "attachment") {
   const params = new URLSearchParams();
-  if (disposition === "inline") params.set("disposition", "inline");
-  const q = params.toString();
-  return diskData<{ url: string }>(`/disk/files/${id}/download${q ? `?${q}` : ""}`);
+  params.set("disposition", disposition);
+  return apiPath(`/disk/files/${encodeURIComponent(id)}/download?${params}`);
+}
+
+export function openFile(id: string, disposition: "inline" | "attachment" = "attachment") {
+  window.open(fileContentURL(id, disposition), "_blank", "noopener,noreferrer");
 }
 
 export function bulkFiles(ids: string[], action: "delete" | "move" | "copy", folderId?: string | null) {

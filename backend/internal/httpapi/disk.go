@@ -2,7 +2,10 @@ package httpapi
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/n8node/aiapp/internal/authn"
@@ -170,12 +173,33 @@ func (h *DiskHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inline := r.URL.Query().Get("disposition") == "inline"
-	url, err := h.disk.DownloadURL(r.Context(), userID, sessionID, chi.URLParam(r, "fileID"), inline)
+	file, stream, err := h.disk.OpenContent(r.Context(), userID, sessionID, chi.URLParam(r, "fileID"), r.Header.Get("Range"))
 	if err != nil {
 		writeAuthError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": model.DiskDownloadResponse{URL: url}})
+	defer stream.Body.Close()
+
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Now().Add(15 * time.Minute))
+
+	w.Header().Set("Content-Type", file.MimeType)
+	w.Header().Set("Content-Disposition", service.ContentDispositionHeader(inline, file.MimeType, file.Name))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Accept-Ranges", "bytes")
+	if stream.Size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(stream.Size, 10))
+	}
+	status := http.StatusOK
+	if stream.Partial {
+		status = http.StatusPartialContent
+		if stream.ContentRange != "" {
+			w.Header().Set("Content-Range", stream.ContentRange)
+		}
+	}
+	w.WriteHeader(status)
+	_, _ = io.Copy(w, stream.Body)
 }
 
 func (h *DiskHandler) BulkFiles(w http.ResponseWriter, r *http.Request) {

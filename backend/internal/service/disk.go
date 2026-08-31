@@ -208,19 +208,23 @@ func (s *DiskService) GetFile(ctx context.Context, userID, sessionID, fileID str
 	return f, err
 }
 
-func (s *DiskService) DownloadURL(ctx context.Context, userID, sessionID, fileID string, inline bool) (string, error) {
+func (s *DiskService) OpenContent(ctx context.Context, userID, sessionID, fileID, rangeHeader string) (*model.DiskFile, *ObjectStream, error) {
 	ws, err := s.resolve(ctx, userID, sessionID)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	f, err := s.repo.GetFile(ctx, ws.ID, fileID, false)
 	if errors.Is(err, repository.ErrNotFound) {
-		return "", ErrDiskFileNotFound
+		return nil, nil, ErrDiskFileNotFound
 	}
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
-	return s.storage.PresignGet(ctx, f.S3Key, f.Name, inline, 5*time.Minute)
+	stream, err := s.storage.OpenObject(ctx, f.S3Key, rangeHeader)
+	if err != nil {
+		return nil, nil, err
+	}
+	return f, stream, nil
 }
 
 func (s *DiskService) PatchFile(ctx context.Context, userID, sessionID, fileID string, req model.DiskFilePatchRequest) (*model.DiskFile, error) {

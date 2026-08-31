@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/n8node/aiapp/internal/filesniff"
 	"github.com/n8node/aiapp/internal/model"
 )
 
@@ -112,29 +113,97 @@ func browserUploadHeaders(contentType string, signed http.Header) map[string]str
 	return headers
 }
 
-func (o *ObjectStorage) PresignGet(ctx context.Context, s3Key, filename string, inline bool, expires time.Duration) (string, error) {
+func (o *ObjectStorage) OpenObject(ctx context.Context, s3Key, rangeHeader string) (*ObjectStream, error) {
 	client, st, err := o.client(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if expires <= 0 {
-		expires = 5 * time.Minute
+	if rangeHeader != "" && !validByteRange(rangeHeader) {
+		rangeHeader = ""
 	}
-	presign := s3.NewPresignClient(client)
-	input := &s3.GetObjectInput{
+	in := &s3.GetObjectInput{
 		Bucket: aws.String(st.Bucket),
 		Key:    aws.String(s3Key),
 	}
-	if inline {
-		input.ResponseContentDisposition = aws.String("inline")
-	} else if filename != "" {
-		input.ResponseContentDisposition = aws.String(`attachment; filename="` + sanitizeDownloadName(filename) + `"`)
+	if rangeHeader != "" {
+		in.Range = aws.String(rangeHeader)
 	}
-	out, err := presign.PresignGetObject(ctx, input, s3.WithPresignExpires(expires))
+	out, err := client.GetObject(ctx, in)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return out.URL, nil
+	var size int64
+	if out.ContentLength != nil {
+		size = *out.ContentLength
+	}
+	cr := ""
+	if out.ContentRange != nil {
+		cr = *out.ContentRange
+	}
+	return &ObjectStream{
+		Body:         out.Body,
+		Size:         size,
+		ContentRange: cr,
+		Partial:      cr != "",
+	}, nil
+}
+
+type ObjectStream struct {
+	Body         io.ReadCloser
+	Size         int64
+	ContentRange string
+	Partial      bool
+}
+
+func validByteRange(h string) bool {
+	h = strings.TrimSpace(h)
+	if h == "" {
+		return false
+	}
+	if len(h) > 128 || strings.Contains(h, ",") {
+		return false
+	}
+	return strings.HasPrefix(strings.ToLower(h), "bytes=")
+}
+
+func allowInlineDisposition(mimeType, name string) bool {
+	m := strings.ToLower(strings.TrimSpace(mimeType))
+	switch {
+	case strings.HasPrefix(m, "image/"), strings.HasPrefix(m, "audio/"), strings.HasPrefix(m, "video/"), m == "application/pdf":
+		return true
+	}
+	switch filesniff.Extension(name) {
+	case "jpg", "jpeg", "png", "gif", "webp", "tif", "tiff", "mp4", "webm", "mp3", "wav", "m4a", "pdf":
+		return true
+	}
+	return false
+}
+
+func ContentDispositionHeader(inline bool, mimeType, name string) string {
+	kind := "attachment"
+	if inline && allowInlineDisposition(mimeType, name) {
+		kind = "inline"
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "file"
+	}
+	ascii := sanitizeDownloadName(name)
+	ascii = strings.Map(func(r rune) rune {
+		if r < 32 || r > 126 || r == '"' || r == '\\' {
+			return '_'
+		}
+		return r
+	}, ascii)
+	if ascii == "" {
+		ascii = "file"
+	}
+	disp := kind + `; filename="` + ascii + `"`
+	escaped := url.PathEscape(name)
+	if escaped != ascii {
+		disp += "; filename*=UTF-8''" + escaped
+	}
+	return disp
 }
 
 type HeadObjectResult struct {

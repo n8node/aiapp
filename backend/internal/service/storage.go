@@ -264,7 +264,7 @@ func putBucketCORS(ctx context.Context, client *s3.Client, bucket string, origin
 		CORSConfiguration: &types.CORSConfiguration{
 			CORSRules: []types.CORSRule{{
 				AllowedHeaders: []string{"*"},
-				AllowedMethods: []string{"GET", "PUT", "POST", "DELETE", "HEAD"},
+				AllowedMethods: []string{"PUT", "HEAD"},
 				AllowedOrigins: origins,
 				ExposeHeaders:  []string{"ETag"},
 				MaxAgeSeconds:  aws.Int32(3600),
@@ -282,7 +282,7 @@ func buildCORSXML(origins []string) string {
 	for _, o := range origins {
 		b.WriteString("    <AllowedOrigin>" + html.EscapeString(o) + "</AllowedOrigin>\n")
 	}
-	for _, method := range []string{"GET", "PUT", "POST", "DELETE", "HEAD"} {
+	for _, method := range []string{"PUT", "HEAD"} {
 		b.WriteString("    <AllowedMethod>" + method + "</AllowedMethod>\n")
 	}
 	b.WriteString("    <AllowedHeader>*</AllowedHeader>\n")
