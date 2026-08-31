@@ -23,6 +23,9 @@ type Config struct {
 	SuperadminName     string   `env:"SUPERADMIN_NAME" envDefault:"George"`
 	ExtractURL         string   `env:"EXTRACT_URL"`
 	ExtractToken       string   `env:"EXTRACT_TOKEN"`
+	GatewayURL         string   `env:"GATEWAY_URL"`
+	GatewayToken       string   `env:"GATEWAY_TOKEN"`
+	StudioURL          string   `env:"STUDIO_URL"`
 }
 
 func Load() (*Config, error) {
@@ -39,7 +42,12 @@ func Load() (*Config, error) {
 	if cfg.ExtractToken == "" {
 		cfg.ExtractToken = cfg.JWTSecret
 	}
+	if cfg.GatewayToken == "" {
+		cfg.GatewayToken = cfg.JWTSecret
+	}
 	cfg.ExtractURL = strings.TrimRight(strings.TrimSpace(cfg.ExtractURL), "/")
+	cfg.GatewayURL = strings.TrimRight(strings.TrimSpace(cfg.GatewayURL), "/")
+	cfg.StudioURL = strings.TrimRight(strings.TrimSpace(cfg.StudioURL), "/")
 	if cfg.IsProduction() {
 		cfg.CookieSecure = true
 		if cfg.JWTSecret == "" || cfg.JWTSecret == "dev-only-change-me" {

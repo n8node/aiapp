@@ -22,8 +22,8 @@ vendor/
 *.bin
 *.safetensors
 *.gguf
-models/
-weights/
+/models/
+/weights/
 
 .DS_Store
 Thumbs.db

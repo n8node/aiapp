@@ -21,6 +21,8 @@ type Dependencies struct {
 	Storage    *service.StorageSettingsService
 	Disk       *service.DiskService
 	Documents  *service.DocumentService
+	Models     *service.ModelService
+	Knowledge  *service.KnowledgeService
 	Tokens     *authn.JWT
 }
 
@@ -33,6 +35,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	storageH := NewStorageHandler(deps.Storage)
 	diskH := NewDiskHandler(deps.Disk)
 	docsH := NewDocumentHandler(deps.Documents)
+	modelH := NewModelHandler(deps.Models)
+	kbH := NewKnowledgeHandler(deps.Knowledge)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -90,6 +94,13 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Get("/documents/{documentID}", docsH.Get)
 				r.Post("/documents/{documentID}/versions/{versionID}/review", docsH.Review)
 				r.Post("/documents/{documentID}/versions/{versionID}/retry", docsH.Retry)
+				r.Get("/knowledge-bases", kbH.List)
+				r.Post("/knowledge-bases", kbH.Create)
+				r.Get("/knowledge-bases/{kbID}", kbH.Get)
+				r.Patch("/knowledge-bases/{kbID}", kbH.Patch)
+				r.Delete("/knowledge-bases/{kbID}", kbH.Delete)
+				r.Post("/knowledge-bases/{kbID}/vectorize", kbH.Vectorize)
+				r.Post("/knowledge-bases/{kbID}/search", kbH.Search)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)
@@ -114,6 +125,11 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/admin/storage-settings", storageH.Get)
 					r.Put("/admin/storage-settings", storageH.Save)
 					r.Post("/admin/storage-settings/test", storageH.Test)
+					r.Get("/admin/auth-gate", modelH.AuthGate)
+					r.Get("/admin/models", modelH.List)
+					r.Post("/admin/models", modelH.Create)
+					r.Post("/admin/models/{modelID}/action", modelH.Action)
+					r.Get("/admin/models/runtime", modelH.Runtime)
 				})
 			})
 		})

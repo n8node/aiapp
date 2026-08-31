@@ -86,3 +86,39 @@ func TestLimitDocumentIngest(t *testing.T) {
 		t.Fatalf("second got %d", rec.Code)
 	}
 }
+
+func TestLimitKnowledgeVectorizeAndSearch(t *testing.T) {
+	upload := newRateLimiter(time.Minute, 1)
+	h := limitDiskUpload(upload)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/knowledge-bases/kb-1/vectorize", nil)
+	req = req.WithContext(authn.WithUser(req.Context(), "user-a", "sess"))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("first vectorize got %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second vectorize got %d", rec.Code)
+	}
+
+	searchLim := newRateLimiter(time.Minute, 1)
+	sh := limitDiskUpload(searchLim)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	sreq := httptest.NewRequest(http.MethodPost, "/api/v1/knowledge-bases/kb-1/search", nil)
+	sreq = sreq.WithContext(authn.WithUser(sreq.Context(), "user-a", "sess"))
+	rec = httptest.NewRecorder()
+	sh.ServeHTTP(rec, sreq)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("first search got %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	sh.ServeHTTP(rec, sreq)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second search got %d", rec.Code)
+	}
+}

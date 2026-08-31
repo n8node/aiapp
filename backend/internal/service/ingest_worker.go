@@ -133,6 +133,8 @@ func publicIngestError(err error) string {
 	switch {
 	case errors.Is(err, ErrExtractUnavailable):
 		return "extract_unavailable"
+	case errors.Is(err, ErrGatewayUnavailable):
+		return "extract_unavailable"
 	case errors.Is(err, ErrExtractFailed):
 		return "extract_failed"
 	case errors.Is(err, ErrObjectTooLarge):

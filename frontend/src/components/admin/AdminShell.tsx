@@ -17,6 +17,13 @@ const nav = [
       { href: "/admin/storage-settings", label: "S3 — хранилище" },
     ],
   },
+  {
+    label: "Модели",
+    items: [
+      { href: "/admin/models", label: "Реестр" },
+      { href: "/admin/unsloth", label: "Unsloth Studio" },
+    ],
+  },
 ];
 
 export function AdminShell({

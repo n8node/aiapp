@@ -117,8 +117,20 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusConflict, "invalid_state", "Документ в этом статусе нельзя изменить"
 	case errors.Is(err, service.ErrExtractUnavailable):
 		return http.StatusBadGateway, "extract_unavailable", "Сервис извлечения текста недоступен"
+	case errors.Is(err, service.ErrGatewayUnavailable):
+		return http.StatusBadGateway, "gateway_unavailable", "Шлюз моделей недоступен"
 	case errors.Is(err, service.ErrObjectTooLarge):
 		return http.StatusRequestEntityTooLarge, "file_too_large", "Файл слишком большой"
+	case errors.Is(err, service.ErrModelNotFound):
+		return http.StatusNotFound, "model_not_found", "Модель не найдена"
+	case errors.Is(err, service.ErrModelInvalidState):
+		return http.StatusConflict, "invalid_state", "Модель в этом статусе нельзя изменить"
+	case errors.Is(err, service.ErrModelSlugTaken):
+		return http.StatusConflict, "slug_taken", "Идентификатор модели уже занят"
+	case errors.Is(err, service.ErrKnowledgeNotFound):
+		return http.StatusNotFound, "knowledge_not_found", "База знаний не найдена"
+	case errors.Is(err, service.ErrVectorizeBusy):
+		return http.StatusConflict, "vectorize_busy", "Векторизация этой коллекции уже выполняется"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}
