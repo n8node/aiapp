@@ -98,11 +98,13 @@ func (a *JWT) ClearCookie(w http.ResponseWriter) {
 }
 
 func ExtractToken(r *http.Request) string {
+	// Cookie first: nginx auth_request forwards Unsloth's Authorization Bearer
+	// on /api/*, which is not our session JWT.
+	if c, err := r.Cookie(AccessCookie); err == nil && c.Value != "" {
+		return c.Value
+	}
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return strings.TrimPrefix(h, "Bearer ")
-	}
-	if c, err := r.Cookie(AccessCookie); err == nil {
-		return c.Value
 	}
 	return ""
 }
