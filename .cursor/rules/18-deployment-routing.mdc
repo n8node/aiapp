@@ -1,0 +1,25 @@
+---
+description: Docker, Nginx routing, Ubuntu deployment, and service exposure
+globs: "{deploy,nginx,wordpress,scripts}/**,**/Dockerfile*,**/docker-compose*.{yml,yaml},Makefile"
+alwaysApply: false
+---
+
+# Deployment and routing
+
+- Target is Ubuntu 24.04 with NVIDIA Container Toolkit and pinned/tested driver, CUDA, container, and ML compatibility versions.
+- Docker Compose is acceptable for the initial single-node application; keep manifests structured for later service separation.
+- Only Nginx publishes 80/443. PostgreSQL, MySQL, MinIO, NATS, Redis/Dragonfly, parsers, model servers, Studio, and admin tools remain internal.
+- Routing: `/` and WordPress paths → WordPress; `/app` → Next.js; `/app/api/v1` → Go backend.
+- Do not expose Unsloth Studio publicly. If web access is required, place it behind separate admin authentication and network controls.
+- TLS redirects HTTP, enables HSTS after validation, uses modern ciphers, and automates renewal without exposing secrets.
+- Apply request/body/time limits per route; streaming chat disables proxy buffering and has bounded idle/total timeouts.
+- Containers run non-root where supported, read-only filesystem where practical, dropped capabilities, no privileged mode, and scoped volumes.
+- Never mount Docker socket into application/AI containers.
+- Separate networks for public edge, application, data, and ML services where Compose permits.
+- Pin image versions/digests in production; do not use `latest`.
+- Persist only declared volumes. Back up data before migrations and validate free disk/VRAM before model operations.
+- Health checks distinguish liveness from readiness; model readiness means the version is loaded and can serve a bounded probe.
+- Deploy backward-compatible schema first, then services, then remove old paths. Keep previous images/config for rollback.
+- Secrets come from server secret management/environment, never Compose literals or repository files.
+- WordPress has separate DB credentials, filesystem, update policy, plugins, backups, and no access to corporate PostgreSQL/MinIO.
+- No production deploy, migration, certificate change, DNS change, or model promotion without explicit user request.

@@ -1,0 +1,25 @@
+---
+description: Secure document ingestion, OCR, normalization, and provenance
+globs: "{backend,ai-runtime,workers}/**/*.{go,py,sql}"
+alwaysApply: false
+---
+
+# Document ingestion
+
+- Supported inputs: PDF, scanned PDF/images, DOCX, XLSX and controlled imports from enterprise connectors.
+- Reuse the DOC project pattern of S3 originals plus isolated Docling-style parsing, but redesign ownership around workspace ACLs.
+- Pipeline: quarantine → validate/scan → persist original → extract/OCR → normalize → segment → embed/index → quality check → publish.
+- Original files are immutable, versioned, checksummed, and retained according to policy. Derived text/indexes are reproducible.
+- Track `document_id`, `version_id`, `workspace_id`, source connector, external key/version, content hash, MIME, size, uploader, and timestamps.
+- Every page/sheet/table/paragraph/chunk retains source coordinates sufficient for citations and review.
+- Use content hash and stable external key to skip unchanged work. Changed versions invalidate or reindex dependent chunks atomically.
+- Parsing runs in a resource-limited worker/container without Internet or internal-network access.
+- Stream bounded S3 content to a controlled temporary file or parser; never buffer an unbounded document entirely in API-process memory.
+- Bound pages, pixels, archive entries, decompressed bytes, formulas, rows/columns, OCR time, and parser memory.
+- Treat Office macros, embedded objects, external links, formulas, and PDF actions as untrusted; do not execute them.
+- XLSX extraction preserves sheet name, cell/range, displayed value, normalized typed value, formula text, and merged-cell context.
+- OCR output records engine/version, language, confidence, page geometry, and warnings; low-confidence pages require visible review state.
+- Never mark a document searchable until all required ACL metadata and index writes are committed.
+- Deleting or revoking access invalidates chunks, summaries, caches, exports, and training eligibility.
+- Parser failures must not corrupt the previous published version.
+- Test malformed files, polyglots, zip bombs, huge scans, duplicate versions, partial failures, and cross-workspace references.

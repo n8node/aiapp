@@ -1,0 +1,25 @@
+---
+description: RigIntel product identity, fixed constraints, target users, and infrastructure
+alwaysApply: true
+---
+
+# RigIntel core
+
+- Product: private corporate AI platform for one company, domain `rigintel.ai`.
+- Canonical git remote: `https://github.com/n8node/aiapp.git`.
+- Audience: about 300 employees; design for at least 100 new AI requests/minute.
+- Primary language: Russian UI and user messages; code, identifiers, API fields, and technical comments in English.
+- Public routing: `/` is WordPress; `/app` is Next.js; `/app/api/v1` is the business API.
+- Access is public Internet over HTTPS without VPN. Never rely on network location as authentication.
+- Identity: local registration, email verification, login, password reset, sessions, and admin blocking. No SSO/LDAP unless explicitly requested later.
+- Tenant model: one company, isolated department workspaces. A user may belong to multiple workspaces.
+- Platform administrators may access all workspaces, but privileged reads and mutations are always audited.
+- Initial tools: corporate knowledge chat and document reconciliation.
+- Supported sources include PDF, scans/images, DOCX, XLSX, 1C, ERP, DMS, mail, and file shares.
+- Every external side effect proposed by an agent requires explicit human approval before execution.
+- Department managers may request fine-tuning through admin workflows; users never receive shell, Python, CUDA, or raw Studio access.
+- Conversation and document retention is configurable by administrators per data category.
+- Target host: Ubuntu 24.04, 48 vCPU, 384 GB RAM, 1 TB SSD, 2× NVIDIA A5000 24 GB.
+- The two GPUs are separate devices; never assume transparent 48 GB VRAM.
+- Production inference has priority. Training is queued for maintenance windows and must not silently degrade online service.
+- WordPress/marketing concerns must remain isolated from corporate application data.

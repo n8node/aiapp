@@ -1,0 +1,24 @@
+---
+description: Python AI runtime, extraction, RAG, and worker conventions
+globs: "{ai-runtime,model-gateway,workers}/**/*.py"
+alwaysApply: false
+---
+
+# Python AI runtime
+
+- Use supported Python with FastAPI, Pydantic v2, typed async clients, and an explicit package manager/lockfile.
+- Keep API routes thin: validate → call application service → map typed errors.
+- Separate `api`, `services`, `domain`, `adapters`, `workers`, and `schemas`; ML imports stay out of lightweight API startup where practical.
+- Type public functions and Pydantic boundaries. Do not pass unvalidated dictionaries between stages.
+- Every job and model call accepts cancellation, deadline, workspace scope, correlation ID, and resource limits.
+- Isolate incompatible CUDA/Transformers workloads in containers or spawned worker processes; never hot-patch shared environments.
+- Pin CUDA, PyTorch, Transformers, Unsloth, vLLM/SGLang, and parser versions as a tested compatibility matrix.
+- Structured extraction uses strict JSON Schema, constrained decoding where available, `additionalProperties: false`, and server validation.
+- Retry only transient failures with bounded exponential backoff and jitter. Do not retry validation, authorization, or OOM indefinitely.
+- Release GPU/model resources deterministically; report OOM as a classified job failure and clean partial artifacts.
+- Never execute generated Python, uploaded scripts, model-provided shell commands, or arbitrary tool code.
+- Do not deserialize untrusted pickle/joblib/torch objects. Prefer safetensors and verified formats.
+- Keep prompts versioned and testable; prompts cannot encode authorization or hidden business invariants.
+- Log technical metadata only: model/version, token counts, latency, queue time, outcome, GPU allocation.
+- Unit-test chunking, schema validation, context budgets, approval boundaries, and prompt-injection handling without live models.
+- Maintain small deterministic fixtures; mark GPU/integration tests separately.

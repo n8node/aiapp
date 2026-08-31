@@ -1,0 +1,23 @@
+---
+description: Deterministic document reconciliation with explainable LLM assistance
+globs: "{backend,ai-runtime,workers,frontend}/**/*.{go,py,sql,ts,tsx}"
+alwaysApply: false
+---
+
+# Document reconciliation
+
+- Reconciliation is a versioned business workflow, not an unconstrained chat prompt.
+- Pipeline: select source sets → parse/OCR → normalize → candidate match → deterministic checks → LLM-assisted classification/explanation → human review → export.
+- Code performs arithmetic, totals, tolerances, dates, currency normalization, duplicate detection, and policy rules.
+- LLM may suggest mappings or explanations but never becomes the sole authority for financial correctness.
+- Preserve each normalized field’s source document, page/sheet/cell/range, raw value, normalized value, parser confidence, and transformation version.
+- Matching rules are explicit, versioned, testable, workspace-scoped, and configurable only through authorized admin workflows.
+- Every discrepancy has type, severity, deterministic evidence, suggested explanation, confidence, reviewer state, and citations.
+- Low OCR confidence, ambiguous counterparties, conflicting currencies, missing pages, and formula errors must surface as review blockers.
+- A reviewer sees side-by-side source evidence and exact normalized values before accepting a result.
+- Approval binds the selected document versions and reconciliation rules hash; source changes invalidate pending approval.
+- Export includes run ID, inputs, rule/model/parser versions, reviewer, timestamps, accepted/rejected differences, and checksums.
+- Never write to 1C/ERP/DMS from reconciliation without a separate approved action proposal.
+- Make runs idempotent and resumable. A retry must not duplicate adjustments, exports, or integration writes.
+- Create golden fixtures for invoices, acts, statements, contracts, spreadsheets, scans, rounding, VAT, duplicates, and adversarial text.
+- Measure field extraction accuracy, match precision/recall, false acceptance, review time, and unresolved rate.

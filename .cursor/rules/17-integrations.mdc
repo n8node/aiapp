@@ -1,0 +1,23 @@
+---
+description: Safe adapters for 1C, ERP, DMS, mail, and file shares
+globs: "{backend,ai-runtime,workers}/**/*.{go,py,sql}"
+alwaysApply: false
+---
+
+# Enterprise integrations
+
+- Integrations use provider interfaces and registries; business services never depend directly on vendor SDKs.
+- Model capabilities explicitly: read, search, download, create draft, update, execute, webhook, and sync cursor.
+- Default connectors to read-only. Write capabilities require separate credentials, scopes, feature flag, and human approval policy.
+- Credentials are encrypted, workspace-scoped, rotatable, testable without disclosure, and never returned after initial entry.
+- Support incremental sync using stable external IDs, version/etag, content hash, cursor, tombstones, and last successful checkpoint.
+- Keep source ACL/classification metadata and map it to RigIntel permissions; do not broaden access during import.
+- Normalize imported content into canonical document/version contracts while retaining provider-specific metadata and lineage.
+- Use bounded concurrency, timeouts, backoff, circuit breakers, rate-limit handling, and idempotency.
+- Webhooks require signature verification, replay protection, deduplication, and later reconciliation against provider state.
+- Prevent SSRF and arbitrary endpoints. Administrators choose from validated connector configurations or allowlisted origins.
+- For 1C prefer supported HTTP/OData/API or controlled file exchange; never automate database writes or COM from the Linux server without an explicit architecture.
+- Mail ingestion strips active content, limits attachments, preserves Message-ID/thread/source, and does not trust sender display names.
+- File-share ingestion prevents path traversal, symlink escapes, credential leakage, and unbounded recursive scans.
+- Connector deletion/revocation stops jobs and defines whether imported documents remain, become inaccessible, or are deleted.
+- Contract and sandbox tests use provider fixtures; production credentials never enter tests.

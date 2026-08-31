@@ -1,0 +1,24 @@
+---
+description: Versioned REST, streaming, idempotency, and error contracts
+globs: "{backend,ai-runtime,model-gateway,frontend}/**/*.{go,py,ts,tsx}"
+alwaysApply: false
+---
+
+# API contracts
+
+- Public business API is versioned under `/app/api/v1`; internal service APIs are separately versioned and not browser-accessible.
+- Use consistent envelopes: `data` plus `meta`, or `error { code, message, details }` plus request metadata.
+- Error codes are stable, documented identifiers; Russian messages are safe for users and never contain internal/provider details.
+- Validate body size and content type before decoding; reject unknown fields on security-sensitive commands.
+- Use cursor pagination for large/audited feeds and bounded page pagination only where stable.
+- Mutating retries require an idempotency key scoped to actor, workspace, operation, and payload hash.
+- Use optimistic versioning or explicit expected state for approvals, jobs, documents, tools, and model deployments.
+- Return `202 Accepted` with `job_id` for OCR, indexing, reconciliation, imports, exports, and training.
+- Chat streaming uses SSE or a justified equivalent with event IDs, typed stages, terminal event, cancellation, and reconnect behavior.
+- Never fake progress in UI. Emit real server stages such as queued, parsing, indexing, retrieving, reranking, generating, awaiting approval.
+- Timeouts and cancellation propagate across services; clients receive whether an operation is safely retryable.
+- Internal service calls use service credentials, audience/scope validation, deadlines, and correlation IDs.
+- Webhooks are signed, timestamped, replay-protected, idempotent, retried with backoff, and recorded without secret payloads.
+- OpenAPI describes public contracts, but generated types do not replace domain validation.
+- Breaking changes require a new API version or explicit compatibility migration.
+- Contract tests cover Go↔Python and backend↔frontend schemas.

@@ -1,0 +1,25 @@
+---
+description: Observability, SLOs, testing, evaluation, and release gates
+globs: "**/*.{go,py,ts,tsx,sql,yml,yaml}"
+alwaysApply: false
+---
+
+# Observability and quality
+
+- Use OpenTelemetry-compatible traces/metrics, Prometheus, Grafana, and centralized structured logs.
+- Propagate request/correlation IDs through Nginx, frontend SSR, Go, NATS jobs, Python, model gateway, and integrations.
+- Metrics: request rate/errors/latency, auth failures, queue depth/age, job outcomes, parser/OCR quality, retrieval latency, TTFT, tokens/sec, VRAM, disk, DB, object storage, backups, and restore age.
+- Labels must have bounded cardinality; never label by prompt, document text, filename, user email, conversation, or arbitrary ID.
+- Traces/logs exclude content and secrets. Sampling and retention are configurable by environment and data class.
+- Define SLOs for login/API, chat availability and latency, ingest completion, approval execution, and recovery.
+- Alert on sustained user impact, data risk, backup/replication failure, disk/VRAM exhaustion, queue age, ACL-denial anomaly, and model crash loops.
+- Unit tests cover domain rules; integration tests cover DB/object/broker; contract tests cover service schemas; E2E covers critical user flows.
+- Authorization tests include cross-workspace access for every resource type and derived artifact.
+- Security tests cover upload abuse, SSRF, prompt injection, tool escalation, approval replay, webhook replay, and secret redaction.
+- RAG evaluation uses versioned Russian datasets and reports retrieval, citation, faithfulness, leakage, latency, and token cost.
+- Model/training releases compare against an immutable baseline and block promotion on threshold regressions.
+- Load tests model 100 requests/minute plus long contexts, streaming, indexing, and queue contention; average RPM alone is insufficient.
+- Backups are not “verified” until automated restore and consistency checks succeed.
+- CI gates formatting, lint/static analysis, focused tests, migrations, contract compatibility, image scan, and secret scan.
+- Flaky tests are fixed or quarantined with owner/expiry; never silently rerun until green.
+- Release notes identify schema, model, prompt, parser, and policy versions affecting behavior.

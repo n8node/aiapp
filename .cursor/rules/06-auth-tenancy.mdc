@@ -1,0 +1,24 @@
+---
+description: Local authentication, department tenancy, RBAC, and privileged access
+globs: "{backend,frontend}/**/*.{go,sql,ts,tsx}"
+alwaysApply: false
+---
+
+# Authentication and tenancy
+
+- Identity uses local registration and authorization; do not add SSO assumptions.
+- Require verified email, strong password policy, rate-limited login/reset, generic anti-enumeration responses, and secure recovery tokens.
+- Hash passwords with Argon2id using versioned parameters; if inheriting bcrypt, cost must be at least 12 and migration must be supported.
+- Browser sessions use `Secure`, `HttpOnly`, `SameSite` cookies, short-lived access, rotating refresh tokens, server-side revocation, and CSRF protection.
+- Seed/create the first platform admin through an operator command, never public registration.
+- Core roles: `platform_admin`, `department_manager`, `knowledge_manager`, `reviewer`, `employee`, `auditor`.
+- Tenant is `workspace` representing a department or explicitly isolated project; all domain rows carry `workspace_id NOT NULL` unless truly global.
+- JWT/session identifies the user, not trusted workspace authority. Resolve active workspace then verify membership on every read and mutation.
+- Central `platform_admin` may access all workspaces, but must use privileged service paths with reason, actor, target, and immutable audit event.
+- Department managers administer members, tools, knowledge bases, approvals, retention choices, and training requests only in their workspace.
+- Knowledge/document permissions propagate to every derived chunk, embedding, summary, citation, export, cache entry, and training sample.
+- Never perform unscoped vector search then filter results afterward. Apply authorized workspace/ACL predicates inside retrieval.
+- Background jobs carry immutable `workspace_id`, initiating user, effective permissions snapshot/reference, and correlation ID.
+- Service accounts/API keys have named scopes, workspace restrictions, expiry, rotation, last-used timestamp, and hashed storage.
+- Blocked users lose active sessions and queued privileged actions.
+- Test horizontal access, role downgrade, stale session, guessed IDs, cross-workspace search, export, share, and job-result access.

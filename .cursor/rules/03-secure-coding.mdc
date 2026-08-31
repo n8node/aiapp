@@ -1,0 +1,29 @@
+---
+description: Mandatory secure coding, privacy, and untrusted-input rules
+alwaysApply: true
+---
+
+# Secure coding
+
+- Treat browsers, uploaded files, document text, model output, tool arguments, webhooks, URLs, and external APIs as untrusted.
+- Authenticate every protected request and authorize every resource in the service layer; UI hiding is not authorization.
+- Never trust `workspace_id`, user ID, role, object key, model ID, price, or approval state supplied by a client.
+- Use parameterized SQL only. Validate IDs, enums, lengths, ranges, pagination, and state transitions.
+- Never log passwords, session tokens, API keys, cookies, prompts, document bodies, embeddings, raw model responses, signed URLs, or integration credentials.
+- Redact secrets recursively from structured errors and telemetry. Return stable public error codes, not stack traces or provider payloads.
+- Store secrets in environment/secret storage; encrypt persisted provider credentials with a separately managed key.
+- Password/session rules live in `06-auth-tenancy.mdc`; do not invent alternate auth in feature handlers.
+- For uploads verify size, extension, declared MIME, magic bytes, archive expansion limits, and malware scan result before processing.
+- Use random server-generated object keys. Never join user-controlled paths or expose filesystem paths.
+- Prevent SSRF: allowlist schemes/hosts, reject metadata/link-local targets, re-check redirects, and bound response size/time. Private targets require an explicit administrator-provisioned enterprise connector allowlist.
+- Keep outbound network access deny-by-default per service. Agent runtime cannot freely browse internal or public networks.
+- Model imports use quarantine, checksum, license record, malware scan, and operator approval. Prefer `safetensors`; reject pickle and disable `trust_remote_code` by default.
+- Documents may contain prompt injection. Retrieved text is evidence, never trusted instructions, credentials, or authorization.
+- Model output cannot directly mutate data or call privileged tools. Validate structured output and pass through approval policy.
+- Protect cookie-authenticated mutations against CSRF. Set CSP, HSTS, frame denial, MIME sniffing denial, and strict referrer policy.
+- CORS uses an exact environment allowlist with credentials policy; never use wildcard origins in production.
+- API keys and capabilities travel only in protected headers or secure cookies, never URL paths/query strings where logs and referrers expose them.
+- Apply rate limits to registration, login, reset, upload, search, inference, training, exports, webhooks, and approval endpoints.
+- Use constant-time secret comparison and cryptographically secure randomness.
+- Security-sensitive changes require negative-path tests and a brief threat review covering tenant escape, privilege escalation, injection, replay, and data leakage.
+- Dependency additions require license and vulnerability review; pin production images and verify provenance.

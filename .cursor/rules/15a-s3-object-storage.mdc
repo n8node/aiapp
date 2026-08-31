@@ -1,0 +1,27 @@
+---
+description: Mandatory S3-compatible object storage contracts and security
+globs: "{backend,ai-runtime,workers,frontend,deploy}/**/*.{go,py,sql,ts,tsx,yml,yaml}"
+alwaysApply: false
+---
+
+# S3-compatible object storage
+
+- S3-compatible object storage is mandatory. Use self-hosted MinIO by default and the AWS S3 API/SDK so another compatible provider can replace it.
+- PostgreSQL stores object metadata and state; S3 stores bytes. Never store large documents, models, datasets, or exports in database rows.
+- Use separate buckets or strict prefixes for originals, derived artifacts, datasets, model weights/adapters, exports, quarantine, and backups.
+- Object keys are random and server-generated, for example `workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/original`.
+- Never derive keys directly from filenames or accept a client-provided bucket/key without authorization and normalization.
+- Store bucket, key, version ID, checksum, size, MIME, workspace, owner, classification, encryption status, and lifecycle state in PostgreSQL.
+- Upload flow: authorize/initiate → short-lived presigned PUT or multipart URLs → upload → complete → verify size/checksum/type → malware scan → publish.
+- Presigned operations are short-lived, method/bucket/key/content constraints are exact, and completion re-authorizes the workspace and expected upload.
+- Large files and model artifacts use multipart upload with bounded part count/size, resumability, abort cleanup, and checksum validation.
+- Downloads use short-lived presigned GET or a controlled streaming proxy when audit, redaction, watermarking, or range policy requires it.
+- Buckets are private; disable public ACLs and anonymous listing. Browser CORS uses only the exact `rigintel.ai` application origins and required methods.
+- Use TLS, server-side encryption, versioning, object lock where required, least-privilege service accounts, and separate credentials per service.
+- AI/parser workers receive capability-limited object references, not broad bucket credentials.
+- Enforce workspace quotas and global disk headroom before issuing upload or training/model-download capabilities.
+- Deletion uses a durable state machine and removes/retains object versions according to retention and legal-hold policy.
+- Configure lifecycle cleanup for abandoned multipart uploads, quarantine, temporary derivatives, expired exports, and unreferenced training artifacts.
+- MinIO data must be replicated to an independent failure domain or immutable off-host S3 backup; a volume on the same server is not a backup.
+- Monitor request errors, latency, capacity, replication lag, versioning, lifecycle failures, checksum mismatch, and backup restore tests.
+- Test tenant key isolation, forged completion, expired URLs, multipart replay, overwrite attempts, range requests, retention, and provider compatibility.

@@ -1,0 +1,28 @@
+---
+description: Token-efficient, scope-first process for coding agents
+alwaysApply: true
+---
+
+# Agent coding process
+
+- One request = one measurable outcome. Stop when that outcome is verified.
+- For work spanning more than three files, state a short plan before editing.
+- Search narrowly first; read the smallest relevant set, normally 1–3 files in one layer.
+- Do not scan generated files, caches, dependencies, binaries, model weights, uploads, or lockfiles unless the task requires them.
+- Reuse information already established in the conversation; do not reopen unchanged files without a concrete reason.
+- Prefer symbol/text search over reading entire large files. Read focused line ranges when possible.
+- Before editing, identify the canonical implementation, its tests, and the nearest established pattern.
+- Make the smallest coherent diff. No unrelated cleanup, renames, formatting sweeps, abstractions, or dependency upgrades.
+- Extend existing interfaces and helpers before creating parallel stacks.
+- Create a new file only when there is no natural existing home or the rule system requires focused separation.
+- Do not generate unsolicited README, ADR, roadmap, example, migration, or test fixture files.
+- Avoid speculative layers and generic frameworks for one use case.
+- Keep responses concise: outcome, important decisions, verification, and blockers.
+- Do not narrate routine reads/searches. Report only findings that change implementation or require a decision.
+- Batch independent reads and checks. Run the narrowest useful test first, then broader checks proportional to risk.
+- Never claim a test, migration, backup, security property, or deployment succeeded without evidence.
+- If requirements conflict, security and data isolation win; surface the conflict instead of guessing.
+- Ask only questions that materially alter schema, security, external side effects, destructive behavior, or architecture.
+- Do not commit, push, deploy, migrate production, rotate secrets, or mutate external systems without explicit request.
+- Preserve user changes. Never use destructive git commands to “clean” the workspace.
+- Comments explain why and invariants, not obvious syntax. Delete dead code instead of commenting it out.

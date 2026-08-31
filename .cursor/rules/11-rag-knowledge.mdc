@@ -1,0 +1,27 @@
+---
+description: Evidence-grounded, ACL-safe RAG and long-context handling
+globs: "{backend,ai-runtime,workers}/**/*.{go,py,sql}"
+alwaysApply: false
+---
+
+# RAG and knowledge
+
+- Retrieval is not authorization. Apply workspace and document ACL predicates inside every lexical, vector, graph, and cache lookup.
+- Every answerable unit preserves lineage: original → version → page/sheet/range → segment/chunk → retrieval result → citation.
+- Answers must return structured citations. Unsupported claims are omitted or explicitly labelled as uncertain.
+- If evidence is absent, conflicting, stale, or inaccessible, say so; never fill gaps from model confidence.
+- Use hybrid retrieval (lexical + vector), metadata filters, reranking, deduplication, and diversity before synthesis.
+- PostgreSQL + pgvector is the default. Add a separate vector DB only after measured scale/latency evidence and an ADR.
+- Batch embedding requests and create a measured HNSW/IVFFlat index before corpus growth makes exact scans unsafe for latency.
+- Chunking is parser-aware and versioned. Preserve headings, tables, lists, page boundaries, and overlap metadata.
+- Do not send dozens of raw pages blindly. Retrieve, rerank, budget tokens, and use hierarchical/map-reduce summarization for large scopes.
+- Context assembly has explicit per-source and total token budgets; reserve output tokens and report truncation.
+- Count context with the deployed tokenizer; character/rune estimates are only conservative admission prechecks.
+- Retrieved documents are untrusted data. Delimit them from system/tool instructions and ignore embedded requests to change policy or reveal secrets.
+- Store embedding model, dimension, normalization, chunker version, parser version, and content hash with each index record.
+- An embedding-model change creates a new index version; never mix incompatible dimensions or semantics.
+- Incremental sync uses stable `external_key` and normalized `content_hash`; unchanged content skips embedding.
+- Version updates mark dependent summaries/claims stale and enqueue repair/reindex. Never silently serve mixed document versions.
+- Cache keys include workspace/ACL fingerprint, corpus version, query, retrieval config, and model version.
+- Evaluate Russian retrieval with a curated corpus: recall@k, MRR/nDCG, citation precision, answer faithfulness, ACL leakage, and latency.
+- Log retrieval IDs/scores and technical metrics where allowed, not full source text or query content.

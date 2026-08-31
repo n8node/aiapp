@@ -1,0 +1,24 @@
+---
+description: Unsloth separation, fine-tuning approvals, datasets, and model promotion
+globs: "{ai-runtime,model-gateway,workers,deploy}/**/*.{py,go,sql,yml,yaml,toml}"
+alwaysApply: false
+---
+
+# Unsloth and fine-tuning
+
+- Use Unsloth Core as the training engine. Keep Unsloth Studio isolated for authorized AI administrators.
+- Do not fork Studio into the proprietary cabinet without explicit legal review: `studio/*` is AGPL-3.0 while Unsloth Core is Apache-2.0.
+- Studio has no authority over RigIntel users, workspaces, approvals, retention, or production deployments.
+- A department manager may submit a training request only for datasets from managed workspaces and models allowed by platform policy.
+- Workflow: draft request → dataset validation → privacy/license review → platform approval → queued training → evaluation → promotion approval → deployment.
+- Users never upload executable training code or choose arbitrary container images, package indexes, filesystem paths, or shell arguments.
+- Build datasets from immutable, versioned snapshots with provenance, consent/classification, ACL, purpose, retention, and content hashes.
+- Exclude secrets, credentials, unsupported personal data, deleted/revoked documents, prompt injection instructions, and cross-workspace content.
+- RAG is the default for changing corporate facts. Fine-tune for behavior, format, extraction, classification, or stable domain patterns—not fact freshness.
+- Prefer LoRA/QLoRA on approved base models. Record full hyperparameters, seeds, package/CUDA versions, GPU allocation, and artifacts.
+- Training is a low-priority scheduled workload and must drain/reserve GPU capacity explicitly; it never silently evicts production inference.
+- Check disk headroom before download/training/export and clean only policy-approved unreferenced artifacts.
+- Evaluate against versioned Russian task suites, baseline model, hallucination, citation behavior, extraction schema, safety, and regression thresholds.
+- Failed evaluation cannot be overridden silently; an exception requires named approver, rationale, scope, and audit event.
+- Promote immutable adapter/model versions through the registry; never overwrite a production artifact in place.
+- Keep source/model licenses and redistribution/use restrictions visible to administrators.

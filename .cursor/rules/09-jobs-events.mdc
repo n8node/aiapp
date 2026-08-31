@@ -1,0 +1,24 @@
+---
+description: Durable jobs, NATS events, retries, cancellation, and GPU queues
+globs: "{backend,ai-runtime,workers}/**/*.{go,py,sql}"
+alwaysApply: false
+---
+
+# Jobs and events
+
+- Long-running work never holds a normal HTTP request: enqueue and return `202 + job_id`.
+- PostgreSQL stores authoritative job state; NATS JetStream transports durable commands/events. Do not treat the broker as the database.
+- Use a transactional outbox for state change plus event publication; consumers are idempotent and deduplicate by stable key.
+- Job state machine: `queued → running → awaiting_approval/completed/failed/cancelled`; define allowed transitions explicitly.
+- Include workspace, initiator, job type/version, input artifact IDs, priority, attempts, deadline, correlation ID, and idempotency key.
+- Do not put document bodies, prompts, credentials, model weights, or large payloads in NATS. Pass authorized object references.
+- Retry transient failures only, with bounded exponential backoff and jitter. Classify permanent validation, policy, license, and authorization errors.
+- Cancellation is persisted and checked between stages; workers must not publish results or execute effects after cancellation.
+- Use leases/heartbeats so abandoned jobs can recover; make stage outputs resumable and content-addressed where practical.
+- Separate queues and concurrency limits for chat support, ingest/OCR, reconciliation, connectors, export, and training.
+- Interactive inference has higher priority than batch indexing; training runs only in approved maintenance capacity.
+- GPU scheduler knows per-device VRAM, loaded models, reservations, and health. Never allocate based on summed VRAM alone.
+- Poison jobs go to a dead-letter workflow visible to operators; no infinite retry loops.
+- Emit progress from real completed stages, not timers.
+- Every transition and human decision creates an audit event.
+- Test duplicate delivery, crash after side effect, stale lease, cancellation race, retry exhaustion, and broker outage.

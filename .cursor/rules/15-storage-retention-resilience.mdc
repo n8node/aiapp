@@ -1,0 +1,25 @@
+---
+description: Storage, retention, backup, recovery, and no-data-loss constraints
+globs: "{backend,ai-runtime,workers,deploy}/**/*.{go,py,sql,yml,yaml}"
+alwaysApply: false
+---
+
+# Storage, retention, and resilience
+
+- PostgreSQL is authoritative metadata/state; MinIO stores originals, derived artifacts, datasets, checkpoints, and exports.
+- Use workspace-prefixed random object keys, server-side encryption, versioning, checksums, least-privilege service accounts, and short-lived signed operations.
+- Never store large blobs in PostgreSQL or treat local container filesystems as durable.
+- Retention policies are versioned by data category: conversations, documents, extracted text, embeddings, run traces, exports, datasets, checkpoints, logs, audit, and backups.
+- On creation, record the effective policy/version; policy changes define whether existing records are migrated.
+- Deletion is a durable workflow covering DB rows, object versions, vectors, caches, derived summaries, training eligibility, and replicas.
+- Legal hold overrides normal deletion and is itself audited.
+- Audit records have separate retention and cannot be deleted by ordinary workspace administrators.
+- “No data loss” cannot be guaranteed on one physical server. Do not claim RPO=0 without synchronous independent replication.
+- Production requires an independent failure domain: synchronous PostgreSQL standby for true RPO=0, plus off-host WAL archive/PITR.
+- MinIO requires replication or immutable off-host versioned backup; local RAID/snapshots alone are not backup.
+- Encrypt backups, separate backup credentials, enforce immutability, monitor completion, and test restores on schedule.
+- Define and verify RPO/RTO per component; prefer automated failover only after split-brain and restore procedures are tested.
+- Schema migrations are backward-compatible, backed up, observable, and reversible where possible; never reset production.
+- Keep enough disk headroom for model download, unpacking, training checkpoints, and rollback. Reject jobs before exhausting disk.
+- Derived vector indexes can be rebuilt; preserve originals, metadata, version lineage, and job checkpoints first.
+- Recovery tests must prove database, object, ACL, model registry, and audit consistency—not merely that containers start.

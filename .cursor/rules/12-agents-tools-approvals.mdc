@@ -1,0 +1,25 @@
+---
+description: Agent composition, least-privilege tools, and mandatory human approval
+globs: "{backend,ai-runtime,workers}/**/*.{go,py,sql}"
+alwaysApply: false
+---
+
+# Agents, tools, and approvals
+
+- An agent is a versioned configuration of prompt, model policy, knowledge scopes, tools, limits, and approval policy.
+- Prefer explicit workflow/state machines for business processes. Do not hide critical logic inside free-form prompts.
+- Each tool has a typed schema, owner, version, risk class, required scopes, timeout, idempotency behavior, and audit policy.
+- Build the allowed tool list server-side from user, workspace, agent, and action policy. Never accept arbitrary tool names/endpoints from the model.
+- Read tools still enforce ACLs. Write/external-effect tools always create a proposal; the model cannot approve its own action.
+- Approval state: `draft → awaiting_approval → approved/rejected/expired → executing → completed/failed`.
+- Bind approval to immutable proposal hash, exact arguments, target, agent/tool/model versions, initiator, workspace, and expiry.
+- Any argument or target change invalidates approval and requires a new decision.
+- Show reviewers the exact operation and human-readable diff; high-risk actions may require two distinct approvers.
+- Execute with a short-lived capability limited to the approved action. Re-authorize at execution time.
+- All tool results are untrusted and size-bounded before returning to the model.
+- Parallel retrieval uses per-layer deadlines and cancellation and may degrade gracefully; privileged action execution fails closed.
+- Store agent run, steps, model calls, retrieval references, tool proposals, approvals, execution receipts, and terminal status.
+- Do not implement MAAS-style autonomous self-editing for authoritative corporate memory. Agent-suggested knowledge changes enter review/weak state.
+- Knowledge additions, merges, splits, deletions, and training-data promotion require a human-reviewed proposal and rollback path.
+- Limit steps, wall time, tokens, tool calls, retries, and spend per run to prevent loops.
+- Test prompt injection requesting tools, forged approval IDs, replay, changed arguments, role downgrade, expired approval, and duplicate execution.

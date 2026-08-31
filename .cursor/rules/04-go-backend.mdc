@@ -1,0 +1,25 @@
+---
+description: Go control-plane architecture and coding conventions
+globs: "backend/**/*.{go,sql}"
+alwaysApply: false
+---
+
+# Go backend
+
+- Use current supported Go, `chi/v5`, `pgx/v5`, `goose`, `slog`, and standard `net/http`.
+- Do not add an ORM, web framework, DI framework, or alternate migration tool without ADR.
+- Layers: handler parses/validates → service enforces use case and authorization → repository performs SQL/I/O.
+- Handlers contain no SQL, provider SDK calls, business rules, or model prompts.
+- Repositories contain no HTTP concerns or authorization decisions.
+- Pass `context.Context` first; propagate cancellation and deadlines to DB, HTTP, queues, and streams.
+- Inject dependencies through explicit constructors and small consumer-owned interfaces.
+- Wrap internal errors with `%w`; map typed domain errors to stable API errors at the boundary. Never panic for request failures.
+- Use UUIDs generated server-side, UTC timestamps, explicit enums, and guarded state transitions.
+- Parameterize all SQL; specify columns; bound result sets; lock or use compare-and-set for concurrent transitions.
+- Transactions live at the service/repository boundary and include all state required for an invariant.
+- Keep methods small and domain-named. Avoid `utils`, global mutable state, reflection, and generic repositories.
+- Long operations enqueue jobs; only latency-bounded chat query/streaming may remain synchronous.
+- Close rows/bodies, check iterator errors, cap request bodies, and configure transport timeouts.
+- Structured logs include request/job IDs, workspace ID, operation, duration, and outcome—never content or secrets.
+- Add table-driven tests for services, authorization, state machines, idempotency, and repository constraints.
+- Run formatting, vet/static analysis, and focused tests before handoff.

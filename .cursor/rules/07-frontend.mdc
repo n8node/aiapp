@@ -1,0 +1,23 @@
+---
+description: Next.js corporate cabinet conventions
+globs: "frontend/**/*.{ts,tsx,css}"
+alwaysApply: false
+---
+
+# Frontend
+
+- Use Next.js App Router, React, strict TypeScript, Tailwind, shadcn/ui primitives, and `output: "standalone"`.
+- Application base path is `/app`; use centralized URL/API helpers and never scatter hardcoded `/app`.
+- Server Components are default. Add `"use client"` only for interaction, browser APIs, or client state.
+- Browser API base is `/app/api/v1`; SSR uses the internal backend URL.
+- Prefer URL/search params for shareable state and local component state for transient UI; add Zustand only for genuinely shared client state.
+- Validate forms with shared schemas; server validation remains authoritative.
+- Russian is the default UI language. Keep user copy clear, formal, and action-oriented; avoid exposing provider/CUDA/internal errors.
+- Every async action has loading, empty, success, retryable error, terminal error, and permission-denied states.
+- Streaming chat must support cancel, reconnect/error display, source citations, model limitations, and partial-response safety.
+- Approval screens show exact proposed action, target, data diff, risk, model/agent version, and approve/reject controls.
+- Never render raw model HTML. Sanitize Markdown, links, filenames, previews, and downloaded content.
+- Do not store access tokens, secrets, document bodies, or privileged approval payloads in `localStorage`.
+- Enforce accessible labels, keyboard flow, focus management, contrast, reduced motion, and responsive layouts.
+- UI permission checks improve UX only; never assume they enforce authorization.
+- Keep feature components colocated; reusable primitives stay domain-neutral.

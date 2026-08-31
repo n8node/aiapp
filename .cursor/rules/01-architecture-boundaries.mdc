@@ -1,0 +1,27 @@
+---
+description: RigIntel service boundaries and dependency direction
+alwaysApply: true
+---
+
+# Architecture boundaries
+
+- Start as a modular platform with independently deployable compute workers, not one microservice per department.
+- Repository target:
+  - `backend/`: Go control plane and business API.
+  - `frontend/`: Next.js application at `/app`.
+  - `ai-runtime/`: Python orchestration, RAG, extraction, and evaluation.
+  - `model-gateway/`: internal OpenAI-compatible routing and model policy.
+  - `workers/` or language-local worker entrypoints: durable background work.
+  - `wordpress/`, `nginx/`, `deploy/`, `scripts/`.
+- Go owns identity, authorization, tenancy, tool catalog, approvals, audit, retention, and integration policy.
+- Python owns ML execution only. It must not become an independent source of authorization truth.
+- Model servers never receive browser traffic directly.
+- Dependency direction: HTTP handler → application service → repository/provider adapter.
+- Domain logic must not live in handlers, React components, SQL migrations, or model prompts.
+- Cross-service communication uses versioned HTTP contracts for queries and durable events/jobs for long work.
+- PostgreSQL is the source of truth for business state; MinIO stores blobs; vector indexes are derived data.
+- Every external provider, parser, model server, and enterprise system is behind an interface and registry.
+- Unsloth Studio is an isolated engineering tool, not the user cabinet, identity system, job queue, or production gateway.
+- Prefer a module inside the existing service until separate dependencies, scaling, blast radius, or release cadence justify extraction.
+- Record a short ADR before adding a backend language, database, broker, vector engine, or orchestration framework.
+- No direct imports across bounded-context internals; share explicit contracts and small common primitives only.

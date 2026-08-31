@@ -1,0 +1,24 @@
+---
+description: Local model gateway, inference capacity, and GPU isolation
+globs: "{model-gateway,ai-runtime,deploy}/**/*.{py,yml,yaml,toml,json}"
+alwaysApply: false
+---
+
+# Model serving
+
+- All application inference goes through an internal Model Gateway with an OpenAI-compatible contract.
+- vLLM or SGLang serves production models; llama.cpp may serve validated GGUF use cases. Unsloth Studio is not the production gateway.
+- Model endpoints are internal-only and authenticate the gateway/service, never end-user browser tokens.
+- Registry records model artifact hash, source, license, architecture, quantization, tokenizer/chat template, context limit, owner, approval, and deployment status.
+- Separate model alias from immutable version so rollbacks do not require application changes.
+- Route by task policy: chat/synthesis, extraction, embeddings, reranking, OCR/vision. Do not use the largest model for every stage.
+- Enforce per-user/workspace/agent concurrency, input/output tokens, context length, queue time, and cancellation.
+- Use continuous batching and measured admission control. Reject or queue overload; never allow uncontrolled GPU OOM.
+- Two A5000 cards are scheduled independently by default for throughput. Use tensor/pipeline parallelism only for a model that cannot fit and after benchmarking topology.
+- NVLink presence must be detected from server topology; never assume it exists.
+- Interactive inference has reserved capacity. Embedding, reranking, indexing, and training cannot starve chat.
+- Health includes readiness after model load, queue depth, tokens/sec, time-to-first-token, active sequences, VRAM, failures, and restart count.
+- Stream only validated text/events; cap generated output and stop runaway generation.
+- Do not log prompts or completions. Usage records contain model/version, token counts, latency, outcome, and scoped IDs.
+- Canary a new model/version, run quality/security evaluations, then promote through an audited admin action.
+- Provide fast rollback to the previous known-good deployment.

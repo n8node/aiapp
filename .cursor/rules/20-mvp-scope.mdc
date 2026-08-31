@@ -1,0 +1,21 @@
+---
+description: RigIntel implementation sequence and anti-scope-creep guardrails
+alwaysApply: true
+---
+
+# MVP sequence
+
+- Phase 1: repository skeleton, Compose, Nginx, WordPress `/`, Next.js `/app`, Go health, PostgreSQL, secure configuration.
+- Phase 2: local registration/login/reset, sessions, platform admin, department workspaces, memberships, RBAC, audit.
+- Phase 3: MinIO document storage, upload security, document/version metadata, Docling/OCR workers, extraction review.
+- Phase 4: knowledge bases, pgvector hybrid retrieval, ACL-safe indexing, Russian chat with citations and streaming.
+- Phase 5: document reconciliation pipeline with deterministic rules, reviewer UI, export, and audit.
+- Phase 6: agent/tool registry, proposal/approval state machine, then read-only connectors.
+- Phase 7: 1C/ERP/DMS/mail/file-share connectors; enable writes only after approval and idempotency are proven.
+- Phase 8: Model Gateway, production serving hardening, model registry, evaluation, canary, rollback.
+- Phase 9: Unsloth training requests, dataset governance, scheduled LoRA/QLoRA, evaluation, promotion.
+- Phase 10: HA, synchronous replica if RPO=0 remains required, off-host object replication, tested failover and restore.
+- Build NATS/transactional outbox before workflows depend on durable distributed events; simple early jobs may use PostgreSQL leases.
+- Do not implement advanced graph/episodic/reflective memory, autonomous self-editing, marketplace billing, arbitrary MCP, or one service per department in MVP.
+- Do not claim production readiness until cross-workspace isolation, restore, load, prompt-injection, and approval-replay tests pass.
+- Each phase has measurable acceptance criteria and can ship without hidden dependency on later phases.
