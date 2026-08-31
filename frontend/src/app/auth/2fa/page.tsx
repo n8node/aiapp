@@ -15,7 +15,8 @@ export default async function TotpPage() {
         <p className="text-sm font-medium text-muted">RigIntel</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Двухфакторная аутентификация</h1>
         <p className="mt-2 text-sm text-muted">
-          Обязательный шаг. Без подтверждения доступ к порталу закрыт.
+          Обязательный шаг. Коды выдаёт приложение на телефоне — без него
+          портал недоступен.
         </p>
       </div>
       <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">

@@ -47,10 +47,49 @@ export function TotpSetupForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <p className="text-sm text-muted">
-        Отсканируйте QR-код в Google Authenticator, Authy или другом приложении,
-        затем введите 6-значный код. Без подтверждения портал недоступен.
-      </p>
+      <div className="rounded-xl border border-border bg-bg px-4 py-3 text-sm">
+        <p className="font-medium text-text">Как подключить</p>
+        <ol className="mt-2 list-decimal space-y-2 pl-4 text-muted">
+          <li>
+            На телефоне откройте{" "}
+            <span className="font-medium text-text">Яндекс ID</span>
+            — это приложение для кодов 2FA. Раньше оно называлось Яндекс.Ключ:
+            если Ключ уже стоит, просто обновите его. Нет приложения?{" "}
+            <a
+              href="https://ya.ru/all?mode=apps&service=key"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline"
+            >
+              Скачать
+            </a>
+            . Ссылка сама откроет магазин вашего устройства.
+          </li>
+          <li>
+            В приложении нажмите «Сканировать QR» и наведите камеру на код
+            ниже. Так делают, когда эта страница открыта на компьютере, а
+            приложение — на телефоне.
+          </li>
+          <li>
+            Если настраиваете с телефона и камера не видит этот экран — в
+            Яндекс ID выберите «Настроить 2FA TOTP» → «Добавить ключ вручную»
+            и введите секрет под QR-кодом.
+          </li>
+          <li>Введите сюда 6 цифр из приложения и подтвердите.</li>
+        </ol>
+        <p className="mt-3 text-xs text-muted">
+          Подойдёт и другое приложение с TOTP. Подробнее:{" "}
+          <a
+            href="https://yandex.ru/support/id/ru/authorization/twofa"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            справка Яндекс ID
+          </a>
+          .
+        </p>
+      </div>
       {otpauth ? (
         <div className="flex justify-center rounded-xl border border-border bg-white p-4">
           <QRCode value={otpauth} size={192} bgColor="#ffffff" fgColor="#111111" />
