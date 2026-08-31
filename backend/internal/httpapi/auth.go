@@ -39,7 +39,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := password.Validate(req.Password); err != nil {
-		writeError(w, http.StatusBadRequest, "password_policy", "Пароль: минимум 10 символов, заглавная, строчная и цифра")
+		writeError(w, http.StatusBadRequest, "password_policy", "Проверьте пароль (мин. 8 символов, заглавные, цифры, спецсимвол)")
 		return
 	}
 	res, err := h.auth.Register(r.Context(), req.Email, req.Password, req.Name, req.InviteCode)

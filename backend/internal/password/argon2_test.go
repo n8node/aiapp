@@ -8,11 +8,14 @@ func TestValidate(t *testing.T) {
 		in      string
 		wantErr bool
 	}{
-		{in: "ValidPass10", wantErr: false},
-		{in: "short1A", wantErr: true},
-		{in: "nouppercase1", wantErr: true},
-		{in: "NOLOWERCASE1", wantErr: true},
-		{in: "NoDigitsHere", wantErr: true},
+		{in: "ValidPass10!", wantErr: false},
+		{in: "Aa1!aaaa", wantErr: false},
+		{in: "ValidPass10", wantErr: true},
+		{in: "sh1A!", wantErr: true},
+		{in: "nouppercase1!", wantErr: true},
+		{in: "NOLOWERCASE1!", wantErr: true},
+		{in: "NoDigitsHere!", wantErr: true},
+		{in: "NoSpecial12", wantErr: true},
 	}
 	for _, tt := range tests {
 		err := Validate(tt.in)
@@ -25,13 +28,23 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+func TestValidateSeed(t *testing.T) {
+	t.Parallel()
+	if err := ValidateSeed("ValidPass10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateSeed("short"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestHashCompare(t *testing.T) {
 	t.Parallel()
-	hash, err := Hash("ValidPass10")
+	hash, err := Hash("ValidPass10!")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Compare(hash, "ValidPass10"); err != nil {
+	if err := Compare(hash, "ValidPass10!"); err != nil {
 		t.Fatal(err)
 	}
 	if err := Compare(hash, "wrong-password"); err == nil {

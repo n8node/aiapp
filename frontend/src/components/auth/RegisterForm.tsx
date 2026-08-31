@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { PasswordField } from "@/components/auth/PasswordField";
 import { ApiError, register, verifyInvite } from "@/lib/api";
+import {
+  checkPasswordRules,
+  isPasswordValid,
+  validatePassword,
+} from "@/lib/password-policy";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -15,6 +21,11 @@ export function RegisterForm() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const rules = useMemo(() => checkPasswordRules(password), [password]);
+  const passwordOk = isPasswordValid(rules);
+  const passwordsMatch = confirm.length > 0 && password === confirm;
+  const canSubmit = passwordOk && passwordsMatch;
 
   async function checkInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +44,11 @@ export function RegisterForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    const pwdErr = validatePassword(password);
+    if (pwdErr) {
+      setError(pwdErr);
+      return;
+    }
     if (password !== confirm) {
       setError("Пароли не совпадают");
       return;
@@ -86,6 +102,11 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </div>
+      ) : null}
       <label className="block text-sm">
         <span className="text-muted">Имя</span>
         <input
@@ -105,34 +126,33 @@ export function RegisterForm() {
           placeholder="имя@rigintel.ai"
         />
       </label>
-      <label className="block text-sm">
-        <span className="text-muted">Пароль</span>
-        <input
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-        />
-        <span className="mt-1 block text-xs text-muted">
-          Минимум 10 символов, заглавная, строчная и цифра
-        </span>
-      </label>
-      <label className="block text-sm">
-        <span className="text-muted">Повтор пароля</span>
-        <input
-          type="password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-        />
-      </label>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      <PasswordField
+        id="password"
+        label="Пароль"
+        value={password}
+        onChange={setPassword}
+        onGenerated={(pwd) => setConfirm(pwd)}
+        autoComplete="new-password"
+        showStrength
+        showRequirements
+        allowGenerate
+      />
+      <PasswordField
+        id="confirm-password"
+        label="Подтвердите пароль"
+        value={confirm}
+        onChange={setConfirm}
+        autoComplete="new-password"
+        showStrength={false}
+        showRequirements={false}
+      />
+      {confirm.length > 0 && !passwordsMatch && (
+        <p className="text-xs text-red-600">Пароли не совпадают</p>
+      )}
       <button
         type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+        disabled={loading || !canSubmit}
+        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Создание…" : "Создать аккаунт"}
       </button>

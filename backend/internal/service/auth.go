@@ -459,7 +459,7 @@ func (s *AuthService) EnsureSuperAdmin(ctx context.Context, email, pass, name st
 	if !errors.Is(err, repository.ErrNotFound) {
 		return nil, false, err
 	}
-	if err := password.Validate(pass); err != nil {
+	if err := password.ValidateSeed(pass); err != nil {
 		return nil, false, err
 	}
 	hash, err := password.Hash(pass)

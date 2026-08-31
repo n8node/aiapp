@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
@@ -27,17 +26,45 @@ const (
 )
 
 func Validate(password string) error {
+	if utf8.RuneCountInString(password) < 8 {
+		return ErrPolicy
+	}
+	var lower, upper, digit, special bool
+	for _, r := range password {
+		switch {
+		case r >= 'a' && r <= 'z':
+			lower = true
+		case r >= 'A' && r <= 'Z':
+			upper = true
+		case r >= '0' && r <= '9':
+			digit = true
+		default:
+			special = true
+		}
+	}
+	if !lower || !upper || !digit || !special {
+		return ErrPolicy
+	}
+	return nil
+}
+
+// ValidateSeed accepts the POSTILKA policy or the original superadmin bootstrap
+// (10+ chars, upper, lower, digit) so a first boot with the reserved account still works.
+func ValidateSeed(password string) error {
+	if Validate(password) == nil {
+		return nil
+	}
 	if utf8.RuneCountInString(password) < 10 {
 		return ErrPolicy
 	}
 	var lower, upper, digit bool
 	for _, r := range password {
 		switch {
-		case unicode.IsLower(r):
+		case r >= 'a' && r <= 'z':
 			lower = true
-		case unicode.IsUpper(r):
+		case r >= 'A' && r <= 'Z':
 			upper = true
-		case unicode.IsDigit(r):
+		case r >= '0' && r <= '9':
 			digit = true
 		}
 	}
