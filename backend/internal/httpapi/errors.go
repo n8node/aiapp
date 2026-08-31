@@ -57,6 +57,16 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusConflict, "totp_enabled", "Двухфакторная аутентификация уже включена"
 	case errors.Is(err, service.ErrForbidden):
 		return http.StatusForbidden, "forbidden", "Недостаточно прав"
+	case errors.Is(err, service.ErrBitrixNotConfigured):
+		return http.StatusBadRequest, "bitrix_not_configured", "Сначала сохраните вебхук Битрикс24"
+	case errors.Is(err, service.ErrBitrixInvalidURL):
+		return http.StatusBadRequest, "bitrix_invalid_url", "Укажите HTTPS URL входящего вебхука вида https://портал/rest/1/ключ/"
+	case errors.Is(err, service.ErrBitrixBlockedHost):
+		return http.StatusBadRequest, "bitrix_blocked_host", "Этот адрес вебхука нельзя использовать"
+	case errors.Is(err, service.ErrBitrixRequest):
+		return http.StatusBadGateway, "bitrix_request", "Битрикс24 не ответил или отклонил запрос. Проверьте права вебхука."
+	case errors.Is(err, service.ErrBitrixBusy):
+		return http.StatusConflict, "bitrix_busy", "Синхронизация уже выполняется"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

@@ -12,6 +12,7 @@ const nav = [
       { href: "/admin/users", label: "Пользователи" },
       { href: "/admin/invites", label: "Инвайт-ключи" },
       { href: "/admin/auth-settings", label: "Домены почты" },
+      { href: "/admin/bitrix", label: "Битрикс24" },
     ],
   },
 ];

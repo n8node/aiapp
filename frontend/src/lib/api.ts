@@ -185,3 +185,67 @@ export function saveAuthDomains(domains: string[]) {
     body: JSON.stringify({ domains }),
   });
 }
+
+export type BitrixStatus = {
+  configured: boolean;
+  portal_host?: string;
+  webhook_masked?: string;
+  last_sync_at?: string | null;
+  last_sync_status?: string;
+  last_sync_error?: string;
+  departments_count: number;
+  users_count: number;
+};
+
+export type BitrixDepartment = {
+  bitrix_id: number;
+  parent_bitrix_id?: number | null;
+  name: string;
+  sort: number;
+};
+
+export type BitrixUser = {
+  bitrix_id: number;
+  email: string;
+  name: string;
+  last_name: string;
+  active: boolean;
+  department_ids: number[];
+};
+
+export function fetchBitrixStatus() {
+  return apiFetch<{ data: BitrixStatus }>("/admin/bitrix");
+}
+
+export function saveBitrixWebhook(webhookURL: string) {
+  return apiFetch<{ data: BitrixStatus }>("/admin/bitrix", {
+    method: "PUT",
+    body: JSON.stringify({ webhook_url: webhookURL }),
+  });
+}
+
+export function disconnectBitrix() {
+  return apiFetch<{ data: BitrixStatus }>("/admin/bitrix", {
+    method: "PUT",
+    body: JSON.stringify({ disconnect: true }),
+  });
+}
+
+export function testBitrix() {
+  return apiFetch<{ data: { ok: boolean } }>("/admin/bitrix/test", { method: "POST" });
+}
+
+export function syncBitrix() {
+  return apiFetch<{ data: { departments: number; users: number } }>("/admin/bitrix/sync", {
+    method: "POST",
+  });
+}
+
+export function fetchBitrixDepartments() {
+  return apiFetch<{ data: { departments: BitrixDepartment[] } }>("/admin/bitrix/departments");
+}
+
+export function fetchBitrixUsers(q = "") {
+  const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+  return apiFetch<{ data: { users: BitrixUser[] } }>(`/admin/bitrix/users${qs}`);
+}

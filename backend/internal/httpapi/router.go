@@ -16,6 +16,7 @@ type Dependencies struct {
 	Config *config.Config
 	Ping   Pinger
 	Auth   *service.AuthService
+	Bitrix *service.BitrixService
 	Tokens *authn.JWT
 }
 
@@ -23,6 +24,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	health := NewHealthHandler(deps.Ping)
 	status := NewStatusHandler(deps.Config.PublicAppURL)
 	authH := NewAuthHandler(deps.Auth, deps.Tokens)
+	bitrixH := NewBitrixHandler(deps.Bitrix)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -63,6 +65,12 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/admin/invites/{inviteID}/revoke", authH.AdminRevokeInvite)
 					r.Get("/admin/auth-domains", authH.AdminGetDomains)
 					r.Put("/admin/auth-domains", authH.AdminSetDomains)
+					r.Get("/admin/bitrix", bitrixH.Status)
+					r.Put("/admin/bitrix", bitrixH.Save)
+					r.Post("/admin/bitrix/test", bitrixH.Test)
+					r.Post("/admin/bitrix/sync", bitrixH.Sync)
+					r.Get("/admin/bitrix/departments", bitrixH.Departments)
+					r.Get("/admin/bitrix/users", bitrixH.Users)
 				})
 			})
 		})
