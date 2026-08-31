@@ -6,6 +6,7 @@ import {
   FileAudio,
   FileText,
   FileVideo,
+  FolderArchive,
   ImageIcon,
   Pencil,
   Trash2,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fileContentURL, formatBytes, type WorkspaceFile } from "@/lib/files-api";
+import { isArchiveFile } from "@/lib/file-view";
 
 type Props = {
   file: WorkspaceFile;
@@ -20,6 +22,8 @@ type Props = {
   onDownload: () => void;
   onRename: () => void;
   onCopy: () => void;
+  onExtract?: () => void;
+  extracting?: boolean;
   onDelete: () => void;
 };
 
@@ -45,7 +49,7 @@ function isAudioMime(mime: string, name: string) {
   return ["mp3", "wav", "m4a", "ogg"].includes(ext);
 }
 
-export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, onDelete }: Props) {
+export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, onExtract, extracting, onDelete }: Props) {
   const previewSrc = fileContentURL(file.id, "inline");
   const isImage = file.mime_type.startsWith("image/");
   const isVideo = isVideoMime(file.mime_type, file.name);
@@ -149,6 +153,17 @@ export function FileDetailPanel({ file, onClose, onDownload, onRename, onCopy, o
               <Copy className="h-4 w-4" />
               Копировать
             </button>
+            {onExtract && isArchiveFile(file) ? (
+              <button
+                type="button"
+                disabled={extracting}
+                onClick={onExtract}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50"
+              >
+                <FolderArchive className="h-4 w-4" />
+                {extracting ? "Распаковка…" : "Распаковать"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onDelete}

@@ -9,6 +9,7 @@ import {
   Folder,
   FolderInput,
   FolderPlus,
+  FolderArchive,
   Grid3x3,
   ImageIcon,
   LayoutGrid,
@@ -36,6 +37,7 @@ import {
   filterFiles,
   filterFolders,
   filtersActive,
+  isArchiveFile,
   kindLabel,
   loadVisibleTabs,
   saveVisibleTabs,
@@ -57,6 +59,7 @@ import {
   deleteFile,
   deleteFolder,
   emptyTrash,
+  extractArchive,
   fetchFolderBreadcrumbs,
   formatBytes,
   isDiskApiError,
@@ -162,6 +165,7 @@ export function FileManager({
   >(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(new Map<string, AbortController>());
   const dragDepth = useRef(0);
@@ -500,6 +504,23 @@ export function FileManager({
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка восстановления");
+    }
+  };
+
+  const handleExtract = async (id: string) => {
+    setExtractingId(id);
+    setError(null);
+    try {
+      const res = await extractArchive(id);
+      setSection("my-files");
+      setFolderId(res.folder.id);
+      setPreviewFileId(null);
+      setSelected(new Set());
+      setSelectedKinds(new Map());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось распаковать архив");
+    } finally {
+      setExtractingId(null);
     }
   };
 
@@ -917,7 +938,7 @@ export function FileManager({
                         </span>
                         <span className="hidden w-24 text-xs text-muted sm:block">{formatBytes(f.size)}</span>
                         <span className="hidden w-36 text-xs text-muted lg:block">{formatFileTime(f.created_at)}</span>
-                        <div className="flex w-24 items-center justify-end gap-1 opacity-0 group-hover:opacity-100">
+                        <div className="flex min-w-24 items-center justify-end gap-1 opacity-0 group-hover:opacity-100">
                           {section !== "trash" ? (
                             <>
                               <button
@@ -928,6 +949,17 @@ export function FileManager({
                               >
                                 <Download className="h-4 w-4" />
                               </button>
+                              {isArchiveFile(f) ? (
+                                <button
+                                  type="button"
+                                  title="Распаковать"
+                                  disabled={extractingId === f.id}
+                                  onClick={() => void handleExtract(f.id)}
+                                  className="rounded p-1.5 text-muted hover:bg-zinc-100 disabled:opacity-50"
+                                >
+                                  <FolderArchive className="h-4 w-4" />
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 title="Переименовать"
@@ -1000,6 +1032,8 @@ export function FileManager({
             setRenameTarget({ kind: "file", id: previewFile.id, current: previewFile.name });
           }}
           onCopy={() => void copyFile(previewFile.id, folderId).then(refresh)}
+          onExtract={() => void handleExtract(previewFile.id)}
+          extracting={extractingId === previewFile.id}
           onDelete={() => setConfirm({ mode: "delete-file", id: previewFile.id })}
         />
       ) : null}
@@ -1034,6 +1068,20 @@ export function FileManager({
                 >
                   <Copy className="h-4 w-4" /> Копировать
                 </button>
+                {selected.size === 1 &&
+                [...selected].some((id) => selectedKinds.get(id) === "file" && files.some((f) => f.id === id && isArchiveFile(f))) ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(extractingId)}
+                    onClick={() => {
+                      const id = [...selected].find((item) => selectedKinds.get(item) === "file");
+                      if (id) void handleExtract(id);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50"
+                  >
+                    <FolderArchive className="h-4 w-4" /> {extractingId ? "Распаковка…" : "Распаковать"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setConfirm({ mode: "delete-selected" })}

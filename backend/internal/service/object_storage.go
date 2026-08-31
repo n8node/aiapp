@@ -235,6 +235,46 @@ func (o *ObjectStorage) HeadObject(ctx context.Context, s3Key string) (*HeadObje
 	return &HeadObjectResult{Size: size, ContentType: ct}, nil
 }
 
+func (o *ObjectStorage) ReadObjectLimited(ctx context.Context, s3Key string, max int64) ([]byte, error) {
+	if max <= 0 {
+		max = filesniff.MaxSizeBytes("application/zip", "archive.zip")
+	}
+	stream, err := o.OpenObject(ctx, s3Key, "")
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(stream.Body, max+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > max {
+		return nil, fmt.Errorf("object too large")
+	}
+	return data, nil
+}
+
+func (o *ObjectStorage) PutObject(ctx context.Context, s3Key, contentType string, body io.Reader, size int64) error {
+	client, st, err := o.client(ctx)
+	if err != nil {
+		return err
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	in := &s3.PutObjectInput{
+		Bucket:      aws.String(st.Bucket),
+		Key:         aws.String(s3Key),
+		Body:        body,
+		ContentType: aws.String(contentType),
+	}
+	if size > 0 {
+		in.ContentLength = aws.Int64(size)
+	}
+	_, err = client.PutObject(ctx, in)
+	return err
+}
+
 func (o *ObjectStorage) ReadHead(ctx context.Context, s3Key string, n int64) ([]byte, error) {
 	if n <= 0 {
 		n = 512

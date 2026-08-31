@@ -13,7 +13,8 @@ var allowedExt = map[string]struct{}{
 	"pdf": {}, "doc": {}, "docx": {}, "xls": {}, "xlsx": {}, "ppt": {}, "pptx": {},
 	"odt": {}, "ods": {}, "odp": {}, "rtf": {}, "txt": {}, "csv": {}, "md": {},
 	"jpg": {}, "jpeg": {}, "png": {}, "gif": {}, "webp": {}, "tif": {}, "tiff": {},
-	"zip": {}, "mp4": {}, "webm": {}, "mp3": {}, "wav": {}, "m4a": {},
+	"zip": {}, "rar": {}, "7z": {}, "tar": {}, "gz": {}, "tgz": {}, "tbz": {}, "tbz2": {},
+	"mp4": {}, "webm": {}, "mp3": {}, "wav": {}, "m4a": {},
 }
 
 func Extension(name string) string {
@@ -35,7 +36,7 @@ func MaxSizeBytes(mimeType, name string) int64 {
 		return 200 << 20
 	case strings.HasPrefix(m, "audio/") || isExt(n, "mp3", "wav", "m4a"):
 		return 50 << 20
-	case strings.Contains(m, "zip") || isExt(n, "zip"):
+	case strings.Contains(m, "zip") || strings.Contains(m, "rar") || strings.Contains(m, "7z") || strings.Contains(m, "tar") || strings.Contains(m, "gzip") || isExt(n, "zip", "rar", "7z", "tar", "gz", "tgz", "tbz", "tbz2"):
 		return 100 << 20
 	default:
 		return 50 << 20
@@ -57,6 +58,12 @@ func MIMEMatchesExtension(mimeType, name string) bool {
 		return strings.HasPrefix(m, "audio/")
 	case "zip":
 		return strings.Contains(m, "zip") || strings.Contains(m, "compressed")
+	case "rar":
+		return strings.Contains(m, "rar") || strings.Contains(m, "compressed")
+	case "7z":
+		return strings.Contains(m, "7z") || strings.Contains(m, "compressed")
+	case "tar", "tgz", "tbz", "tbz2", "gz":
+		return strings.Contains(m, "tar") || strings.Contains(m, "gzip") || strings.Contains(m, "bzip") || strings.Contains(m, "compressed")
 	case "pdf":
 		return m == "application/pdf"
 	case "doc":
@@ -102,6 +109,19 @@ func HeadMatches(name string, head []byte) bool {
 		return bytes.HasPrefix(head, []byte{0x49, 0x49, 0x2a, 0x00}) || bytes.HasPrefix(head, []byte{0x4d, 0x4d, 0x00, 0x2a})
 	case "zip", "docx", "xlsx", "pptx", "odt", "ods", "odp":
 		return bytes.HasPrefix(head, []byte("PK"))
+	case "rar":
+		return bytes.HasPrefix(head, []byte("Rar!")) || bytes.HasPrefix(head, []byte{0x52, 0x61, 0x72, 0x21})
+	case "7z":
+		return bytes.HasPrefix(head, []byte{'7', 'z', 0xbc, 0xaf, 0x27, 0x1c})
+	case "gz", "tgz":
+		return bytes.HasPrefix(head, []byte{0x1f, 0x8b})
+	case "tbz", "tbz2":
+		return bytes.HasPrefix(head, []byte("BZh"))
+	case "tar":
+		if bytes.HasPrefix(head, []byte("MZ")) {
+			return false
+		}
+		return true
 	case "doc", "xls", "ppt":
 		return bytes.HasPrefix(head, []byte{0xd0, 0xcf, 0x11, 0xe0})
 	case "rtf":
@@ -140,6 +160,41 @@ func looksLikeText(head []byte) bool {
 		}
 	}
 	return printable*10 >= len(head)*8
+}
+
+func MIMEFromName(name string) string {
+	switch Extension(name) {
+	case "pdf":
+		return "application/pdf"
+	case "png":
+		return "image/png"
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "gif":
+		return "image/gif"
+	case "webp":
+		return "image/webp"
+	case "tif", "tiff":
+		return "image/tiff"
+	case "mp4":
+		return "video/mp4"
+	case "webm":
+		return "video/webm"
+	case "mp3":
+		return "audio/mpeg"
+	case "wav":
+		return "audio/wav"
+	case "m4a":
+		return "audio/mp4"
+	case "txt", "md":
+		return "text/plain"
+	case "csv":
+		return "text/csv"
+	case "zip":
+		return "application/zip"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func isExt(name string, exts ...string) bool {

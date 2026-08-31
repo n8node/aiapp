@@ -87,3 +87,9 @@ type DiskBulkItemError struct {
 	ID      string `json:"id"`
 	Message string `json:"message"`
 }
+
+type DiskExtractResult struct {
+	Folder  DiskFolder `json:"folder"`
+	Files   int        `json:"files"`
+	Skipped int        `json:"skipped"`
+}

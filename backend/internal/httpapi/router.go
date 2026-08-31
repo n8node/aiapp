@@ -71,6 +71,7 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Patch("/disk/files/{fileID}", diskH.PatchFile)
 				r.Delete("/disk/files/{fileID}", diskH.DeleteFile)
 				r.Post("/disk/files/{fileID}/copy", diskH.CopyFile)
+				r.Post("/disk/files/{fileID}/extract", diskH.ExtractArchive)
 				r.Get("/disk/files/{fileID}/download", diskH.Download)
 				r.Get("/disk/folders", diskH.ListFolders)
 				r.Post("/disk/folders", diskH.CreateFolder)

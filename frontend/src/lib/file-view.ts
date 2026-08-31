@@ -59,7 +59,7 @@ export function classifyFile(file: Pick<WorkspaceFile, "name" | "mime_type">): E
     mime.includes("7z") ||
     mime.includes("tar") ||
     mime.includes("gzip") ||
-    ["zip", "rar", "7z", "tar", "gz"].includes(ext)
+    ["zip", "rar", "7z", "tar", "gz", "tgz", "tbz", "tbz2"].includes(ext)
   ) {
     return "archive";
   }
@@ -76,6 +76,12 @@ export function classifyFile(file: Pick<WorkspaceFile, "name" | "mime_type">): E
     return "document";
   }
   return "other";
+}
+
+export function isArchiveFile(file: Pick<WorkspaceFile, "name" | "mime_type">): boolean {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".tar.gz") || lower.endsWith(".tar.bz2")) return true;
+  return classifyFile(file) === "archive";
 }
 
 export function kindLabel(kind: Exclude<FileKind, "all">): string {

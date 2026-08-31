@@ -26,6 +26,10 @@ var (
 	ErrDiskNameTaken      = errors.New("disk name taken")
 	ErrDiskUploadSession  = errors.New("disk upload session")
 	ErrDiskStorageDelete  = errors.New("disk storage delete")
+	ErrDiskNotArchive     = errors.New("disk not archive")
+	ErrDiskArchiveLimit   = errors.New("disk archive limit")
+	ErrDiskArchiveEncrypt = errors.New("disk archive encrypted")
+	ErrDiskStorageWrite   = errors.New("disk storage write")
 )
 
 const diskBulkLimit = 200

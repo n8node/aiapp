@@ -226,6 +226,13 @@ export function copyFile(id: string, folderId: string | null) {
   });
 }
 
+export function extractArchive(id: string) {
+  return diskData<{ folder: WorkspaceFolder; files: number; skipped: number }>(
+    `/disk/files/${encodeURIComponent(id)}/extract`,
+    { method: "POST" },
+  );
+}
+
 export function deleteFile(id: string) {
   return diskData<{ ok: boolean }>(`/disk/files/${id}`, { method: "DELETE" });
 }

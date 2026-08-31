@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -81,7 +82,18 @@ func limitAuth(login, register *rateLimiter) func(http.Handler) http.Handler {
 func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost || r.URL.Path != "/api/v1/disk/files/upload/init" {
+			if r.Method != http.MethodPost {
+				next.ServeHTTP(w, r)
+				return
+			}
+			path := r.URL.Path
+			kind := ""
+			switch {
+			case path == "/api/v1/disk/files/upload/init":
+				kind = "upload"
+			case strings.HasSuffix(path, "/extract") && strings.Contains(path, "/disk/files/"):
+				kind = "extract"
+			default:
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -89,9 +101,13 @@ func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 			if !ok || key == "" {
 				key = clientIP(r)
 			}
-			if !upload.allow(key) {
+			if !upload.allow(key + ":" + kind) {
 				w.Header().Set("Retry-After", "5")
-				writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много загрузок, подождите")
+				msg := "Слишком много загрузок, подождите"
+				if kind == "extract" {
+					msg = "Слишком много распаковок, подождите"
+				}
+				writeError(w, http.StatusTooManyRequests, "rate_limited", msg)
 				return
 			}
 			next.ServeHTTP(w, r)

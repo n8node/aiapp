@@ -101,6 +101,14 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusBadRequest, "upload_session", "Загрузка не завершена. Повторите попытку."
 	case errors.Is(err, service.ErrDiskStorageDelete):
 		return http.StatusBadGateway, "storage_delete", "Не удалось удалить файл из хранилища. Повторите попытку."
+	case errors.Is(err, service.ErrDiskStorageWrite):
+		return http.StatusBadGateway, "storage_write", "Не удалось записать файл в хранилище. Повторите попытку."
+	case errors.Is(err, service.ErrDiskNotArchive):
+		return http.StatusBadRequest, "not_archive", "Этот файл нельзя распаковать"
+	case errors.Is(err, service.ErrDiskArchiveLimit):
+		return http.StatusBadRequest, "archive_limit", "Архив слишком большой или в нём слишком много файлов"
+	case errors.Is(err, service.ErrDiskArchiveEncrypt):
+		return http.StatusBadRequest, "archive_encrypted", "Архив защищён паролем"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

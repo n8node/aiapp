@@ -166,6 +166,22 @@ func (h *DiskHandler) CopyFile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": file})
 }
 
+func (h *DiskHandler) ExtractArchive(w http.ResponseWriter, r *http.Request) {
+	userID, sessionID, ok := h.actor(r)
+	if !ok || h.disk == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Не авторизован")
+		return
+	}
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Now().Add(15 * time.Minute))
+	out, err := h.disk.ExtractArchive(r.Context(), userID, sessionID, chi.URLParam(r, "fileID"))
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": out})
+}
+
 func (h *DiskHandler) Download(w http.ResponseWriter, r *http.Request) {
 	userID, sessionID, ok := h.actor(r)
 	if !ok || h.disk == nil {
