@@ -202,6 +202,37 @@ export type BitrixDepartment = {
   parent_bitrix_id?: number | null;
   name: string;
   sort: number;
+  head_bitrix_id?: number | null;
+  workspace_id?: string | null;
+  workspace_name?: string | null;
+  include_descendants?: boolean | null;
+};
+
+export type WorkspaceBitrixLink = {
+  workspace_id: string;
+  workspace_name?: string;
+  bitrix_department_id: number;
+  department_name?: string;
+  include_descendants: boolean;
+};
+
+export type AdminWorkspace = {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  created_at: string;
+  member_count: number;
+  bitrix_departments: WorkspaceBitrixLink[];
+};
+
+export type MembershipApplyResult = {
+  workspaces: number;
+  matched: number;
+  added: number;
+  updated: number;
+  removed: number;
+  unmatched: number;
 };
 
 export type BitrixUser = {
@@ -236,7 +267,9 @@ export function testBitrix() {
 }
 
 export function syncBitrix() {
-  return apiFetch<{ data: { departments: number; users: number } }>("/admin/bitrix/sync", {
+  return apiFetch<{
+    data: { departments: number; users: number; memberships?: MembershipApplyResult };
+  }>("/admin/bitrix/sync", {
     method: "POST",
   });
 }
@@ -248,4 +281,29 @@ export function fetchBitrixDepartments() {
 export function fetchBitrixUsers(q = "") {
   const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
   return apiFetch<{ data: { users: BitrixUser[] } }>(`/admin/bitrix/users${qs}`);
+}
+
+export function fetchAdminWorkspaces() {
+  return apiFetch<{ data: { workspaces: AdminWorkspace[] } }>("/admin/workspaces");
+}
+
+export function createWorkspaceFromDepartment(bitrixDepartmentID: number, includeDescendants = true, name = "") {
+  return apiFetch<{ data: AdminWorkspace }>("/admin/workspaces", {
+    method: "POST",
+    body: JSON.stringify({
+      bitrix_department_id: bitrixDepartmentID,
+      include_descendants: includeDescendants,
+      name,
+    }),
+  });
+}
+
+export function applyWorkspaceMemberships() {
+  return apiFetch<{ data: MembershipApplyResult }>("/admin/workspaces/apply", { method: "POST" });
+}
+
+export function unlinkWorkspaceDepartment(workspaceID: string, deptID: number) {
+  return apiFetch<{ data: { ok: boolean } }>(`/admin/workspaces/${workspaceID}/bitrix/${deptID}`, {
+    method: "DELETE",
+  });
 }

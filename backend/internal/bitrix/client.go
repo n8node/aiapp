@@ -240,6 +240,7 @@ func (c *Client) CurrentUser(ctx context.Context, base *url.URL) error {
 type Department struct {
 	ID       int64
 	ParentID *int64
+	HeadID   *int64
 	Name     string
 	Sort     int
 }
@@ -282,9 +283,15 @@ func (c *Client) ListDepartments(ctx context.Context, base *url.URL) ([]Departme
 			if parent > 0 {
 				parentID = &parent
 			}
+			head := asInt64(first(row, "UF_HEAD", "uf_head"))
+			var headID *int64
+			if head > 0 {
+				headID = &head
+			}
 			out = append(out, Department{
 				ID:       id,
 				ParentID: parentID,
+				HeadID:   headID,
 				Name:     asString(first(row, "NAME", "name")),
 				Sort:     int(asInt64(first(row, "SORT", "sort"))),
 			})

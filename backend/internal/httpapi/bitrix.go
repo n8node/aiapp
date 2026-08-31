@@ -9,11 +9,12 @@ import (
 )
 
 type BitrixHandler struct {
-	bitrix *service.BitrixService
+	bitrix     *service.BitrixService
+	workspaces *service.WorkspaceService
 }
 
-func NewBitrixHandler(bitrix *service.BitrixService) *BitrixHandler {
-	return &BitrixHandler{bitrix: bitrix}
+func NewBitrixHandler(bitrix *service.BitrixService, workspaces *service.WorkspaceService) *BitrixHandler {
+	return &BitrixHandler{bitrix: bitrix, workspaces: workspaces}
 }
 
 func (h *BitrixHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +67,13 @@ func (h *BitrixHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": res})
+	data := map[string]any{"departments": res.Departments, "users": res.Users}
+	if h.workspaces != nil {
+		if applied, applyErr := h.workspaces.ApplyMemberships(r.Context(), actor); applyErr == nil {
+			data["memberships"] = applied
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": data})
 }
 
 func (h *BitrixHandler) Departments(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +81,13 @@ func (h *BitrixHandler) Departments(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAuthError(w, err)
 		return
+	}
+	if h.workspaces != nil {
+		deps, err = h.workspaces.EnrichDepartments(r.Context(), deps)
+		if err != nil {
+			writeAuthError(w, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"departments": deps}})
 }

@@ -71,6 +71,12 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusBadGateway, "bitrix_request", "Битрикс24 не ответил или отклонил запрос. Проверьте права вебхука."
 	case errors.Is(err, service.ErrBitrixBusy):
 		return http.StatusConflict, "bitrix_busy", "Синхронизация уже выполняется"
+	case errors.Is(err, service.ErrWorkspaceNotFound):
+		return http.StatusNotFound, "workspace_not_found", "Рабочее пространство не найдено"
+	case errors.Is(err, service.ErrDepartmentUnknown):
+		return http.StatusBadRequest, "department_unknown", "Сначала синхронизируйте отделы из Битрикс24"
+	case errors.Is(err, service.ErrDepartmentMapped):
+		return http.StatusConflict, "department_mapped", "Этот отдел уже привязан к пространству"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

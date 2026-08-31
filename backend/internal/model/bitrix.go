@@ -14,10 +14,14 @@ type BitrixStatus struct {
 }
 
 type BitrixDepartment struct {
-	BitrixID       int64  `json:"bitrix_id"`
-	ParentBitrixID *int64 `json:"parent_bitrix_id,omitempty"`
-	Name           string `json:"name"`
-	Sort           int    `json:"sort"`
+	BitrixID           int64   `json:"bitrix_id"`
+	ParentBitrixID     *int64  `json:"parent_bitrix_id,omitempty"`
+	Name               string  `json:"name"`
+	Sort               int     `json:"sort"`
+	HeadBitrixID       *int64  `json:"head_bitrix_id,omitempty"`
+	WorkspaceID        *string `json:"workspace_id,omitempty"`
+	WorkspaceName      *string `json:"workspace_name,omitempty"`
+	IncludeDescendants *bool   `json:"include_descendants,omitempty"`
 }
 
 type BitrixUser struct {

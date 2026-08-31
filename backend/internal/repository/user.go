@@ -63,6 +63,42 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 	return scanUser(row)
 }
 
+func (r *UserRepository) IDsByEmails(ctx context.Context, emails []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(emails) == 0 {
+		return out, nil
+	}
+	lowered := make([]string, 0, len(emails))
+	seen := map[string]struct{}{}
+	for _, e := range emails {
+		e = strings.ToLower(strings.TrimSpace(e))
+		if e == "" {
+			continue
+		}
+		if _, ok := seen[e]; ok {
+			continue
+		}
+		seen[e] = struct{}{}
+		lowered = append(lowered, e)
+	}
+	if len(lowered) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT id, lower(email) FROM users WHERE lower(email) = ANY($1)`, lowered)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, email string
+		if err := rows.Scan(&id, &email); err != nil {
+			return nil, err
+		}
+		out[email] = id
+	}
+	return out, rows.Err()
+}
+
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*model.UserRecord, error) {
 	row := r.pool.QueryRow(ctx, `SELECT `+userCols+` FROM users WHERE id = $1`, id)
 	return scanUser(row)

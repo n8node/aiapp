@@ -51,6 +51,7 @@ func main() {
 	authSvc := service.NewAuthService(users, workspaces, invites, settings, sessions, audit, tokens, cfg.TOTPKey, "RigIntel")
 	bitrixStore := repository.NewBitrixRepository(handle)
 	bitrixSvc := service.NewBitrixService(settings, bitrixStore, audit, cfg.TOTPKey)
+	workspaceSvc := service.NewWorkspaceService(workspaces, users, bitrixStore, audit)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
 		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
@@ -65,7 +66,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

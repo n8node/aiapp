@@ -33,6 +33,29 @@ type Workspace struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type WorkspaceBitrixLink struct {
+	WorkspaceID        string `json:"workspace_id"`
+	WorkspaceName      string `json:"workspace_name,omitempty"`
+	BitrixDepartmentID int64  `json:"bitrix_department_id"`
+	DepartmentName     string `json:"department_name,omitempty"`
+	IncludeDescendants bool   `json:"include_descendants"`
+}
+
+type WorkspaceAdmin struct {
+	Workspace
+	MemberCount       int                   `json:"member_count"`
+	BitrixDepartments []WorkspaceBitrixLink `json:"bitrix_departments"`
+}
+
+type MembershipApplyResult struct {
+	Workspaces int `json:"workspaces"`
+	Matched    int `json:"matched"`
+	Added      int `json:"added"`
+	Updated    int `json:"updated"`
+	Removed    int `json:"removed"`
+	Unmatched  int `json:"unmatched"`
+}
+
 type Invite struct {
 	ID            string     `json:"id"`
 	CodePrefix    string     `json:"code_prefix"`

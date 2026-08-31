@@ -33,8 +33,8 @@ func (r *BitrixRepository) ReplaceSnapshot(ctx context.Context, deps []bitrix.De
 	}
 	for _, d := range deps {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO bitrix_departments (bitrix_id, parent_bitrix_id, name, sort, synced_at)
-			VALUES ($1, $2, $3, $4, NOW())`, d.ID, d.ParentID, d.Name, d.Sort); err != nil {
+			INSERT INTO bitrix_departments (bitrix_id, parent_bitrix_id, head_bitrix_id, name, sort, synced_at)
+			VALUES ($1, $2, $3, $4, $5, NOW())`, d.ID, d.ParentID, d.HeadID, d.Name, d.Sort); err != nil {
 			return err
 		}
 	}
@@ -58,7 +58,7 @@ func (r *BitrixRepository) Counts(ctx context.Context) (deps, users int, err err
 
 func (r *BitrixRepository) ListDepartments(ctx context.Context) ([]model.BitrixDepartment, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT bitrix_id, parent_bitrix_id, name, sort
+		SELECT bitrix_id, parent_bitrix_id, head_bitrix_id, name, sort
 		FROM bitrix_departments
 		ORDER BY sort, name`)
 	if err != nil {
@@ -68,7 +68,7 @@ func (r *BitrixRepository) ListDepartments(ctx context.Context) ([]model.BitrixD
 	out := make([]model.BitrixDepartment, 0)
 	for rows.Next() {
 		var d model.BitrixDepartment
-		if err := rows.Scan(&d.BitrixID, &d.ParentBitrixID, &d.Name, &d.Sort); err != nil {
+		if err := rows.Scan(&d.BitrixID, &d.ParentBitrixID, &d.HeadBitrixID, &d.Name, &d.Sort); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -86,6 +86,26 @@ func (r *BitrixRepository) ListUsers(ctx context.Context, q string, limit int) (
 		WHERE ($1 = '' OR email ILIKE $2 OR name ILIKE $2 OR last_name ILIKE $2)
 		ORDER BY last_name, name
 		LIMIT $3`, q, "%"+q+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]model.BitrixUser, 0)
+	for rows.Next() {
+		var u model.BitrixUser
+		if err := rows.Scan(&u.BitrixID, &u.Email, &u.Name, &u.LastName, &u.Active, &u.DepartmentIDs); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (r *BitrixRepository) ListAllUsers(ctx context.Context) ([]model.BitrixUser, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT bitrix_id, email, name, last_name, active, department_ids
+		FROM bitrix_users
+		ORDER BY last_name, name`)
 	if err != nil {
 		return nil, err
 	}

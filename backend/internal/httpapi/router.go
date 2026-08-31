@@ -13,18 +13,20 @@ import (
 )
 
 type Dependencies struct {
-	Config *config.Config
-	Ping   Pinger
-	Auth   *service.AuthService
-	Bitrix *service.BitrixService
-	Tokens *authn.JWT
+	Config     *config.Config
+	Ping       Pinger
+	Auth       *service.AuthService
+	Bitrix     *service.BitrixService
+	Workspaces *service.WorkspaceService
+	Tokens     *authn.JWT
 }
 
 func NewRouter(deps Dependencies) http.Handler {
 	health := NewHealthHandler(deps.Ping)
 	status := NewStatusHandler(deps.Config.PublicAppURL)
 	authH := NewAuthHandler(deps.Auth, deps.Tokens)
-	bitrixH := NewBitrixHandler(deps.Bitrix)
+	bitrixH := NewBitrixHandler(deps.Bitrix, deps.Workspaces)
+	workspaceH := NewWorkspaceHandler(deps.Workspaces)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -71,6 +73,11 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/admin/bitrix/sync", bitrixH.Sync)
 					r.Get("/admin/bitrix/departments", bitrixH.Departments)
 					r.Get("/admin/bitrix/users", bitrixH.Users)
+					r.Get("/admin/workspaces", workspaceH.List)
+					r.Post("/admin/workspaces", workspaceH.CreateFromDepartment)
+					r.Post("/admin/workspaces/apply", workspaceH.Apply)
+					r.Post("/admin/workspaces/{workspaceID}/bitrix", workspaceH.LinkDepartment)
+					r.Delete("/admin/workspaces/{workspaceID}/bitrix/{deptID}", workspaceH.UnlinkDepartment)
 				})
 			})
 		})

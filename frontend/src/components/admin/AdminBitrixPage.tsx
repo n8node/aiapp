@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ApiError,
+  createWorkspaceFromDepartment,
   disconnectBitrix,
   fetchBitrixDepartments,
   fetchBitrixStatus,
@@ -27,7 +28,8 @@ export function AdminBitrixPage() {
   const [webhook, setWebhook] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"save" | "test" | "sync" | "disconnect" | null>(null);
+  const [busy, setBusy] = useState<"save" | "test" | "sync" | "disconnect" | "workspace" | null>(null);
+  const [includeChildren, setIncludeChildren] = useState(true);
   const [departments, setDepartments] = useState<BitrixDepartment[]>([]);
   const [users, setUsers] = useState<BitrixUser[]>([]);
   const [userQ, setUserQ] = useState("");
@@ -118,12 +120,32 @@ export function AdminBitrixPage() {
     setBusy("sync");
     try {
       const res = await syncBitrix();
-      setNotice(`Синхронизация завершена: ${res.data.departments} отделов, ${res.data.users} сотрудников`);
+      let msg = `Синхронизация завершена: ${res.data.departments} отделов, ${res.data.users} сотрудников`;
+      const m = res.data.memberships;
+      if (m) {
+        msg += `. Членства: +${m.added}, без учётки ${m.unmatched}`;
+      }
+      setNotice(msg);
       await loadStatus();
       await loadSnapshot(userQ);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Синхронизация не удалась");
       void loadStatus();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createWorkspace(dept: BitrixDepartment) {
+    setError(null);
+    setNotice(null);
+    setBusy("workspace");
+    try {
+      const res = await createWorkspaceFromDepartment(dept.bitrix_id, includeChildren, dept.name);
+      setNotice(`Создано пространство «${res.data.name}»`);
+      await loadSnapshot(userQ);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось создать пространство");
     } finally {
       setBusy(null);
     }
@@ -263,8 +285,16 @@ export function AdminBitrixPage() {
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
           <h2 className="text-base font-semibold">Отделы из Битрикс</h2>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={includeChildren}
+              onChange={(e) => setIncludeChildren(e.target.checked)}
+            />
+            Включать подотделы
+          </label>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -272,13 +302,14 @@ export function AdminBitrixPage() {
               <tr>
                 <th className="px-4 py-2">Отдел</th>
                 <th className="px-4 py-2">Родитель</th>
-                <th className="px-4 py-2">ID</th>
+                <th className="px-4 py-2">Пространство</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
               {departments.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-slate-500" colSpan={3}>
+                  <td className="px-4 py-6 text-slate-500" colSpan={4}>
                     Пока пусто — запустите синхронизацию
                   </td>
                 </tr>
@@ -289,7 +320,24 @@ export function AdminBitrixPage() {
                     <td className="px-4 py-3 text-slate-500">
                       {d.parent_bitrix_id ? namesById.get(d.parent_bitrix_id) || d.parent_bitrix_id : "—"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs">{d.bitrix_id}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {d.workspace_name || "—"}
+                      {d.workspace_id && d.include_descendants ? (
+                        <span className="ml-1 text-xs text-slate-400">+ подотделы</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {d.workspace_id ? null : (
+                        <button
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => void createWorkspace(d)}
+                          className="text-sm text-blue-700 hover:underline disabled:opacity-40"
+                        >
+                          Создать пространство
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
