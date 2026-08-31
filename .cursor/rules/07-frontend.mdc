@@ -7,6 +7,7 @@ alwaysApply: false
 # Frontend
 
 - Use Next.js App Router, React, strict TypeScript, Tailwind, shadcn/ui primitives, and `output: "standalone"`.
+- Visual language is `07a-ui-cabinet-admin.mdc` (POSTILKA cabinet/admin). Do not invent a dark or purple theme.
 - Application base path is `/app`; use centralized URL/API helpers and never scatter hardcoded `/app`.
 - Server Components are default. Add `"use client"` only for interaction, browser APIs, or client state.
 - Browser API base is `/app/api/v1`; SSR uses the internal backend URL.

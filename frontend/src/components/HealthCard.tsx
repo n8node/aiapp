@@ -35,25 +35,23 @@ export function HealthCard() {
 
   if (error) {
     return (
-      <p className="rounded-lg border border-red-400/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+      <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
         {error}
       </p>
     );
   }
 
   if (!health) {
-    return (
-      <p className="text-sm text-muted">Проверяем состояние платформы…</p>
-    );
+    return <p className="text-sm text-muted">Проверяем состояние платформы…</p>;
   }
 
   const ok = health.status === "ok";
   return (
     <p
-      className={`rounded-lg border px-4 py-3 text-sm ${
+      className={`rounded-xl border px-4 py-3 text-sm ${
         ok
-          ? "border-emerald-400/30 bg-emerald-950/30 text-emerald-200"
-          : "border-amber-400/30 bg-amber-950/30 text-amber-100"
+          ? "border-border bg-surface text-muted"
+          : "border-amber-200 bg-amber-50 text-amber-900"
       }`}
     >
       API: {ok ? "доступен" : health.status}

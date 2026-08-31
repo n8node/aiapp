@@ -8,9 +8,9 @@ DOMAIN="${DOMAIN:-rigintel.ai}"
 WWW_DOMAIN="${WWW_DOMAIN:-www.rigintel.ai}"
 EMAIL="${CERTBOT_EMAIL:-}"
 MODE="${1:-standalone}"
+COMPOSE=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml)
 
 if [ -f .env ]; then
-  # shellcheck disable=SC1091
   set -a
   # shellcheck disable=SC1091
   source .env
@@ -31,10 +31,34 @@ fi
 echo "Requesting Let's Encrypt certificate for $DOMAIN and $WWW_DOMAIN"
 echo "Do not include bitrix.rigintel.ai — it is a separate host."
 
+if ! command -v certbot >/dev/null 2>&1; then
+  echo "Installing certbot..."
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get install -y certbot
+fi
+if ! command -v certbot >/dev/null 2>&1; then
+  echo "certbot is not installed. Run: apt-get install -y certbot" >&2
+  exit 1
+fi
+
+port_in_use() {
+  ss -tln | grep -qE ':80\s'
+}
+
 case "$MODE" in
   standalone)
-    if ss -tln | grep -qE ':80\s'; then
-      echo "Port 80 is busy. Stop the process or use: $0 webroot" >&2
+    if "${COMPOSE[@]}" ps --services >/dev/null 2>&1; then
+      "${COMPOSE[@]}" stop nginx >/dev/null 2>&1 || true
+    fi
+    for _ in $(seq 1 15); do
+      if ! port_in_use; then
+        break
+      fi
+      sleep 1
+    done
+    if port_in_use; then
+      echo "Port 80 is still busy after stopping nginx." >&2
       ss -tlnp | grep -E ':80|:443' || true
       exit 1
     fi
@@ -61,4 +85,13 @@ if ! crontab -l 2>/dev/null | grep -q "aiapp/scripts/install-certs.sh"; then
   echo "Installed daily certbot renew cron"
 fi
 
-echo "Certificate ready. Continue with: make prod"
+if [ ! -f "$ROOT/nginx/ssl/fullchain.pem" ] || [ ! -f "$ROOT/nginx/ssl/privkey.pem" ]; then
+  echo "TLS files were not installed; not starting nginx." >&2
+  exit 1
+fi
+
+if "${COMPOSE[@]}" ps --services >/dev/null 2>&1; then
+  "${COMPOSE[@]}" up -d nginx
+fi
+
+echo "Certificate ready."

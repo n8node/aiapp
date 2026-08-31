@@ -34,14 +34,16 @@ nano .env   # заменить все CHANGE_ME_* на длинные случа
 
 ## 3. Бесплатный TLS (Let's Encrypt)
 
-Порт 80 должен быть свободен:
+Сначала сертификат, потом `make prod`. Без `nginx/ssl/*.pem` nginx в prod не стартует.
+
+Порт 80 должен быть свободен. Если контейнеры уже подняты, скрипт сам остановит nginx:
 
 ```bash
 ss -tlnp | grep -E ':80|:443'
 bash scripts/issue-certs.sh standalone
 ```
 
-Если 80 уже слушает Compose nginx:
+Если 80 уже слушает Compose nginx и ACME-location доступен:
 
 ```bash
 bash scripts/issue-certs.sh webroot

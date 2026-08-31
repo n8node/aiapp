@@ -10,6 +10,7 @@ down:
 	$(COMPOSE) down
 
 prod:
+	@test -f nginx/ssl/fullchain.pem -a -f nginx/ssl/privkey.pem || { echo "TLS files missing. Run: bash scripts/issue-certs.sh standalone"; exit 1; }
 	$(COMPOSE_PROD) up --build -d
 	bash scripts/verify-release.sh
 

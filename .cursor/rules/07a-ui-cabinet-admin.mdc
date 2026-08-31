@@ -1,0 +1,25 @@
+---
+description: Cabinet and admin visual language copied from POSTILKA; forbid purple/navy product themes
+alwaysApply: true
+---
+
+# UI chrome (POSTILKA)
+
+Visual source of truth is the POSTILKA cabinet and admin. Do not invent a new “AI product” look.
+
+Cabinet tokens (copy into Tailwind, use by name):
+- `bg` `#f5f5f5`, `surface` `#ffffff`, `text` `#09090b`, `muted` `#71717b`, `border` `#e5e5e5`, `accent` `#2563eb`
+
+Forbidden as brand, page fill, gradients, or chrome: violet, purple, fuchsia, indigo-as-theme, navy canvases, `#0b1220` on cabinet/auth, neon, glassmorphism.
+
+Cabinet (users):
+- Light canvas `bg-bg`. White sticky sidebar `bg-surface border-r border-border`, width `w-60` / collapsed `w-[4.25rem]`.
+- Active nav: `bg-zinc-100 font-medium`. Hover: `hover:bg-zinc-50`. Icons: Lucide, `h-4 w-4`.
+- Cards: `rounded-xl border border-border bg-surface shadow-sm`. Headers: POSTILKA `PageHeader` (breadcrumbs + `text-2xl font-semibold`).
+- Empty: dashed `EmptyState`. Primary button: `bg-accent text-white rounded-lg`. Secondary: `border border-border bg-surface`.
+- Copy `AppShell`, `PageHeader`, `CabinetPage`, `EmptyState` structure from POSTILKA; change labels only. Do not copy SMM nav.
+
+Admin:
+- Copy POSTILKA `AdminShell` only: sidebar `#0b1220` + slate text, canvas `#eef1f6`, white/70 top bar, active item `bg-blue-600`. That dark navy is admin chrome, never the cabinet.
+
+Auth and `/app` landing use cabinet light tokens, not a dark splash. WordPress `/` may differ; Next.js `/app` must not.

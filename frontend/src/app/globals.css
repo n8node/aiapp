@@ -2,12 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent: #2563eb;
+  --accent-border: rgba(37, 99, 235, 0.35);
+  --accent-bg: rgba(37, 99, 235, 0.08);
+  --radius-lg: 0.75rem;
+}
+
 html,
 body {
   min-height: 100%;
 }
 
 body {
-  background: theme("colors.bg");
-  color: theme("colors.text");
+  @apply bg-bg text-text antialiased;
 }
