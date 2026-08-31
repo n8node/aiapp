@@ -14,7 +14,7 @@ func TestCORSRejectsUnknownOrigin(t *testing.T) {
 		PublicAppURL: "https://rigintel.ai/app",
 		CORSOrigins:  []string{"https://rigintel.ai"},
 	}
-	handler := NewRouter(cfg, stubPinger{})
+	handler := NewRouter(Dependencies{Config: cfg, Ping: stubPinger{}})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
 	req.Header.Set("Origin", "https://evil.example")
@@ -32,7 +32,7 @@ func TestCORSAllowsExactOrigin(t *testing.T) {
 		PublicAppURL: "https://rigintel.ai/app",
 		CORSOrigins:  []string{"https://rigintel.ai"},
 	}
-	handler := NewRouter(cfg, stubPinger{})
+	handler := NewRouter(Dependencies{Config: cfg, Ping: stubPinger{}})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
 	req.Header.Set("Origin", "https://rigintel.ai")

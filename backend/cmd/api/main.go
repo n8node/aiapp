@@ -9,9 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/n8node/aiapp/internal/authn"
 	"github.com/n8node/aiapp/internal/config"
 	"github.com/n8node/aiapp/internal/db"
 	httpapi "github.com/n8node/aiapp/internal/httpapi"
+	"github.com/n8node/aiapp/internal/migrate"
+	"github.com/n8node/aiapp/internal/repository"
+	"github.com/n8node/aiapp/internal/service"
 )
 
 func main() {
@@ -23,6 +27,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := migrate.Up(cfg.DatabaseURL); err != nil {
+		logger.Error("migrations", "error", err)
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -31,9 +40,30 @@ func main() {
 	}
 	defer pool.Close()
 
+	handle := pool.Handle()
+	users := repository.NewUserRepository(handle)
+	workspaces := repository.NewWorkspaceRepository(handle)
+	invites := repository.NewInviteRepository(handle)
+	settings := repository.NewSettingsRepository(handle)
+	sessions := repository.NewSessionRepository(handle)
+	audit := repository.NewAuditRepository(handle)
+	tokens := authn.NewJWT(cfg.JWTSecret, cfg.CookieSecure)
+	authSvc := service.NewAuthService(users, workspaces, invites, settings, sessions, audit, tokens, cfg.TOTPKey, "RigIntel")
+
+	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
+		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
+			logger.Error("ensure superadmin", "error", err)
+			os.Exit(1)
+		} else if created {
+			logger.Info("superadmin created")
+		} else {
+			logger.Info("superadmin ready")
+		}
+	}
+
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(cfg, pool),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { HealthCard } from "@/components/HealthCard";
 
 export default function HomePage() {
@@ -9,9 +10,22 @@ export default function HomePage() {
           Корпоративная AI-платформа
         </h1>
         <p className="mt-3 max-w-xl text-sm text-muted">
-          Чат по базе знаний и сверка документов для отделов компании. Кабинет
-          доступен после входа. Маркетинговый сайт — на главной странице.
+          Чат по базе знаний и сверка документов для отделов компании.
         </p>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/auth/login"
+          className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white"
+        >
+          Войти
+        </Link>
+        <Link
+          href="/auth/register"
+          className="rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-medium"
+        >
+          Регистрация
+        </Link>
       </div>
       <HealthCard />
     </main>

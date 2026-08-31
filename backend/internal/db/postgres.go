@@ -34,6 +34,10 @@ func (p *Pool) Ping(ctx context.Context) error {
 	return p.inner.Ping(ctx)
 }
 
+func (p *Pool) Handle() *pgxpool.Pool {
+	return p.inner
+}
+
 func (p *Pool) Close() {
 	p.inner.Close()
 }

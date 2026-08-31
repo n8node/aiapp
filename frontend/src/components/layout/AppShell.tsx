@@ -1,0 +1,98 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { useState } from "react";
+import { logout, type User } from "@/lib/api";
+import { cn } from "@/lib/cn";
+
+const nav = [
+  { href: "/dashboard", label: "Обзор", icon: LayoutDashboard },
+  { href: "/settings", label: "Настройки", icon: Settings },
+];
+
+export function AppShell({ user, children }: { user: User; children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [collapsed, setCollapsed] = useState(false);
+
+  async function handleLogout() {
+    await logout();
+    router.push("/auth/login");
+    router.refresh();
+  }
+
+  return (
+    <div className="flex min-h-screen bg-bg text-text">
+      <aside
+        className={cn(
+          "sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-surface",
+          collapsed ? "w-[4.25rem]" : "w-60",
+        )}
+      >
+        <div className="flex h-14 items-center justify-between border-b border-border px-4">
+          {!collapsed && (
+            <Link href="/dashboard" className="text-base font-semibold tracking-tight">
+              RigIntel
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="rounded-md p-1.5 text-muted hover:bg-zinc-100"
+            aria-label="Свернуть меню"
+          >
+            {collapsed ? "»" : "«"}
+          </button>
+        </div>
+        <nav className="flex flex-1 flex-col gap-1 p-2">
+          {nav.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm",
+                  active ? "bg-zinc-100 font-medium text-text" : "text-muted hover:bg-zinc-50 hover:text-text",
+                  collapsed && "justify-center px-2",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {!collapsed && item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="border-t border-border p-2">
+          {user.is_platform_admin && !collapsed && (
+            <Link href="/admin/users" className="mb-2 block rounded-md px-2.5 py-1.5 text-xs text-accent hover:underline">
+              Админка платформы
+            </Link>
+          )}
+          <div className={cn("flex items-center gap-2 px-2 py-2", collapsed && "justify-center")}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold">
+              {(user.name || user.email)[0]?.toUpperCase()}
+            </div>
+            {!collapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{user.name || user.email}</p>
+                  <p className="truncate text-xs text-muted">{user.email}</p>
+                </div>
+                <button type="button" onClick={handleLogout} className="rounded-md p-1.5 text-muted hover:bg-zinc-100" aria-label="Выйти">
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </aside>
+      <main className="min-w-0 flex-1">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+      </main>
+    </div>
+  );
+}

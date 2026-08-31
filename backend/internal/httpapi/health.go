@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -76,10 +75,4 @@ func (h *StatusHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"request_id": requestID(r),
 		},
 	})
-}
-
-func writeJSON(w http.ResponseWriter, code int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(body)
 }

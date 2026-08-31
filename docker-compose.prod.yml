@@ -37,6 +37,7 @@ services:
       NEXT_PUBLIC_API_URL: /app/api/v1
       NEXT_PUBLIC_APP_NAME: RigIntel
       NEXT_PUBLIC_SITE_URL: https://rigintel.ai
+      INTERNAL_API_URL: http://backend:8080
     logging:
       driver: json-file
       options:
