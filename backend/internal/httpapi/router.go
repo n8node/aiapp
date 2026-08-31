@@ -40,7 +40,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(cors(deps.Config.CORSOrigins))
 	r.Use(csrfOrigin(deps.Config.CORSOrigins))
 	r.Use(securityHeaders)
-	r.Use(limitAuth(newRateLimiter(15*time.Minute, 20), newRateLimiter(15*time.Minute, 10), newRateLimiter(15*time.Minute, 40)))
+	r.Use(limitAuth(newRateLimiter(15*time.Minute, 20), newRateLimiter(15*time.Minute, 10)))
 
 	r.Get("/live", health.Live)
 	r.Get("/ready", health.Ready)
@@ -61,6 +61,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(requireTotp(deps.Auth))
+				r.Use(limitDiskUpload(newRateLimiter(15*time.Minute, 500)))
 				r.Put("/auth/workspace", authH.SwitchWorkspace)
 				r.Get("/disk/files", diskH.ListFiles)
 				r.Post("/disk/files/upload/init", diskH.UploadInit)

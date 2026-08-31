@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/n8node/aiapp/internal/authn"
 )
 
 type rateLimiter struct {
@@ -51,7 +53,7 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-func limitAuth(login, register, upload *rateLimiter) func(http.Handler) http.Handler {
+func limitAuth(login, register *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
@@ -70,11 +72,27 @@ func limitAuth(login, register, upload *rateLimiter) func(http.Handler) http.Han
 					writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много попыток, подождите")
 					return
 				}
-			case "/api/v1/disk/files/upload/init":
-				if !upload.allow(ip) {
-					writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много загрузок, подождите")
-					return
-				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/v1/disk/files/upload/init" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			key, ok := authn.UserID(r.Context())
+			if !ok || key == "" {
+				key = clientIP(r)
+			}
+			if !upload.allow(key) {
+				w.Header().Set("Retry-After", "5")
+				writeError(w, http.StatusTooManyRequests, "rate_limited", "Слишком много загрузок, подождите")
+				return
 			}
 			next.ServeHTTP(w, r)
 		})

@@ -169,14 +169,33 @@ export async function uploadFile(
   signal?: AbortSignal,
 ) {
   const mimeType = file.type || "application/octet-stream";
-  const init = await initUpload({
-    name: file.name,
-    size: file.size,
-    mime_type: mimeType,
-    folder_id: folderId,
-  });
+  const init = await withRateLimitRetry(() =>
+    initUpload({
+      name: file.name,
+      size: file.size,
+      mime_type: mimeType,
+      folder_id: folderId,
+    }),
+  );
+  if (signal?.aborted) {
+    throw new DOMException("Загрузка отменена", "AbortError");
+  }
   await putWithProgress(init.upload_url, file, init.upload_headers ?? {}, onProgress, signal);
   return completeUpload(init.upload_session_token);
+}
+
+async function withRateLimitRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < 6; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (!(e instanceof ApiError) || e.status !== 429 || i === 5) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (i + 1)));
+    }
+  }
+  throw last;
 }
 
 export function createFolder(name: string, parentId?: string | null) {
