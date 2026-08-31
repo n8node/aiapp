@@ -64,6 +64,13 @@ func (a *JWT) Parse(token string) (userID, sessionID string, err error) {
 
 const cookiePath = "/" // site root: Unsloth Vite assets live at /assets, not /app
 
+func cookieSameSite(secure bool) http.SameSite {
+	if secure {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
 func (a *JWT) SetCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     AccessCookie,
@@ -72,7 +79,7 @@ func (a *JWT) SetCookie(w http.ResponseWriter, token string) {
 		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
 		HttpOnly: true,
 		Secure:   a.secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: cookieSameSite(a.secure),
 	})
 }
 
@@ -85,7 +92,7 @@ func (a *JWT) ClearCookie(w http.ResponseWriter) {
 			MaxAge:   -1,
 			HttpOnly: true,
 			Secure:   a.secure,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: cookieSameSite(a.secure),
 		})
 	}
 }

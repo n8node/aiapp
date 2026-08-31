@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
     value: token,
     path: "/",
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: request.nextUrl.protocol === "https:" ? "none" : "lax",
     secure: request.nextUrl.protocol === "https:",
     maxAge: 60 * 60 * 24 * 7,
   });
