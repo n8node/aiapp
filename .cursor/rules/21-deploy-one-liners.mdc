@@ -1,0 +1,14 @@
+---
+description: Give the user server deploy commands as one copy-paste line
+alwaysApply: true
+---
+
+# Deploy commands for the user
+
+When the user must run something on the server (Termius, SSH, `/opt/aiapp`), give **one** copy-paste line. Chain with `&&`. Do not split into a multi-line script, a numbered list of commands, or several fenced blocks.
+
+Example: `cd /opt/aiapp && git pull origin main && make prod-frontend`
+
+Keep comments and explanations outside that line. If a secret is required, put the assignment in the same line (`WP_ADMIN_PASSWORD='…' bash scripts/wp-bootstrap.sh`). Stop after a failed step is implied by `&&`.
+
+This applies only to commands the user runs. Agent-executed local git/tests stay as tool calls.

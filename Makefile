@@ -1,4 +1,4 @@
-.PHONY: up down prod prod-backend prod-frontend prod-nginx verify-release test lint logs setup status
+.PHONY: up down prod prod-backend prod-frontend prod-nginx verify-release test lint logs setup status wp-perms
 
 COMPOSE := docker compose --env-file .env
 COMPOSE_PROD := $(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml
@@ -44,3 +44,6 @@ status:
 
 setup:
 	bash scripts/setup.sh
+
+wp-perms:
+	$(COMPOSE_PROD) exec -u root -T wordpress sh -c 'mkdir -p /var/www/html/wp-content/uploads /var/www/html/wp-content/themes /var/www/html/wp-content/plugins /var/www/html/wp-content/mu-plugins /var/www/html/wp-content/upgrade /var/www/html/wp-content/cache && chown -R www-data:www-data /var/www/html/wp-content && chmod -R ug+rwX /var/www/html/wp-content'
