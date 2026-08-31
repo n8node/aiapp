@@ -25,7 +25,10 @@ var (
 	ErrDiskInvalidMove    = errors.New("disk invalid move")
 	ErrDiskNameTaken      = errors.New("disk name taken")
 	ErrDiskUploadSession  = errors.New("disk upload session")
+	ErrDiskStorageDelete  = errors.New("disk storage delete")
 )
+
+const diskBulkLimit = 200
 
 type DiskService struct {
 	repo     *repository.DiskRepository
@@ -309,28 +312,53 @@ func (s *DiskService) DeleteFile(ctx context.Context, userID, sessionID, fileID 
 	if err != nil {
 		return err
 	}
-	if _, err := s.repo.GetFile(ctx, ws.ID, fileID, false); errors.Is(err, repository.ErrNotFound) {
+	f, err := s.repo.GetFile(ctx, ws.ID, fileID, false)
+	if errors.Is(err, repository.ErrNotFound) {
 		return ErrDiskFileNotFound
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
 	}
-	if err := s.repo.SoftDeleteFiles(ctx, ws.ID, []string{fileID}, newTrashBatch(), time.Now().UTC()); err != nil {
+	if err := s.purgeFiles(ctx, ws.ID, []model.DiskFile{*f}); err != nil {
 		return err
 	}
-	s.audit.Write(ctx, userID, "disk.file.trash", fileID)
+	s.audit.Write(ctx, userID, "disk.file.delete", fileID)
 	return nil
 }
 
 func (s *DiskService) BulkFiles(ctx context.Context, userID, sessionID string, req model.DiskBulkRequest) (*model.DiskBulkResult, error) {
 	res := &model.DiskBulkResult{}
-	if len(req.IDs) > 50 {
+	if len(req.IDs) == 0 || len(req.IDs) > diskBulkLimit {
 		return nil, ErrInvalidInput
+	}
+	if req.Action == "delete" {
+		ws, err := s.resolve(ctx, userID, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		files, err := s.repo.ListFilesByIDs(ctx, ws.ID, req.IDs, false)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.purgeFiles(ctx, ws.ID, files); err != nil {
+			return nil, err
+		}
+		res.OK = len(files)
+		found := make(map[string]struct{}, len(files))
+		for _, f := range files {
+			found[f.ID] = struct{}{}
+			s.audit.Write(ctx, userID, "disk.file.delete", f.ID)
+		}
+		for _, id := range req.IDs {
+			if _, ok := found[id]; !ok {
+				res.Errors = append(res.Errors, model.DiskBulkItemError{ID: id, Message: "не удалось"})
+			}
+		}
+		return res, nil
 	}
 	for _, id := range req.IDs {
 		var err error
 		switch req.Action {
-		case "delete":
-			err = s.DeleteFile(ctx, userID, sessionID, id)
 		case "move":
 			_, err = s.MoveFile(ctx, userID, sessionID, id, req.FolderID)
 		case "copy":
@@ -483,33 +511,16 @@ func (s *DiskService) DeleteFolder(ctx context.Context, userID, sessionID, folde
 	} else if err != nil {
 		return err
 	}
-	folderIDs, err := s.repo.CollectSubtreeIDs(ctx, folderID, true)
-	if err != nil {
+	if err := s.purgeFolderTree(ctx, ws.ID, folderID, false); err != nil {
 		return err
 	}
-	var fileIDs []string
-	for _, fid := range folderIDs {
-		ids, err := s.repo.CollectFileIDsInFolder(ctx, fid, true)
-		if err != nil {
-			return err
-		}
-		fileIDs = append(fileIDs, ids...)
-	}
-	batch := newTrashBatch()
-	now := time.Now().UTC()
-	if err := s.repo.SoftDeleteFiles(ctx, ws.ID, fileIDs, batch, now); err != nil {
-		return err
-	}
-	if err := s.repo.SoftDeleteFolders(ctx, ws.ID, folderIDs, batch, now); err != nil {
-		return err
-	}
-	s.audit.Write(ctx, userID, "disk.folder.trash", folderID)
+	s.audit.Write(ctx, userID, "disk.folder.delete", folderID)
 	return nil
 }
 
 func (s *DiskService) BulkFolders(ctx context.Context, userID, sessionID string, req model.DiskBulkRequest) (*model.DiskBulkResult, error) {
 	res := &model.DiskBulkResult{}
-	if len(req.IDs) > 50 {
+	if len(req.IDs) == 0 || len(req.IDs) > diskBulkLimit {
 		return nil, ErrInvalidInput
 	}
 	for _, id := range req.IDs {
@@ -630,34 +641,14 @@ func (s *DiskService) PermanentDelete(ctx context.Context, userID, sessionID, id
 		return err
 	}
 	if kind == "folder" {
-		f, err := s.repo.GetFolder(ctx, ws.ID, id, true)
-		if errors.Is(err, repository.ErrNotFound) {
+		if _, err := s.repo.GetFolder(ctx, ws.ID, id, true); errors.Is(err, repository.ErrNotFound) {
 			return ErrDiskFolderNotFound
-		}
-		if err != nil {
+		} else if err != nil {
 			return err
 		}
-		folderIDs, err := s.repo.CollectSubtreeIDs(ctx, f.ID, false)
-		if err != nil {
+		if err := s.purgeFolderTree(ctx, ws.ID, id, true); err != nil {
 			return err
 		}
-		var fileIDs []string
-		for _, fid := range folderIDs {
-			ids, err := s.repo.CollectFileIDsInFolder(ctx, fid, false)
-			if err != nil {
-				return err
-			}
-			fileIDs = append(fileIDs, ids...)
-		}
-		files, err := s.repo.ListFilesByIDs(ctx, ws.ID, fileIDs, true)
-		if err != nil {
-			return err
-		}
-		for _, file := range files {
-			_ = s.storage.DeleteObject(ctx, file.S3Key)
-			_, _ = s.repo.DeleteFilePermanent(ctx, ws.ID, file.ID)
-		}
-		_ = s.repo.DeleteFoldersByIDs(ctx, ws.ID, folderIDs)
 		s.audit.Write(ctx, userID, "disk.folder.purge", id)
 		return nil
 	}
@@ -668,8 +659,7 @@ func (s *DiskService) PermanentDelete(ctx context.Context, userID, sessionID, id
 	if err != nil {
 		return err
 	}
-	_ = s.storage.DeleteObject(ctx, f.S3Key)
-	if _, err := s.repo.DeleteFilePermanent(ctx, ws.ID, id); err != nil {
+	if err := s.purgeFiles(ctx, ws.ID, []model.DiskFile{*f}); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, userID, "disk.file.purge", id)
@@ -685,23 +675,62 @@ func (s *DiskService) EmptyTrash(ctx context.Context, userID, sessionID string) 
 	if err != nil {
 		return err
 	}
-	for _, f := range files {
-		_ = s.storage.DeleteObject(ctx, f.S3Key)
-		_, _ = s.repo.DeleteFilePermanent(ctx, ws.ID, f.ID)
+	if err := s.purgeFiles(ctx, ws.ID, files); err != nil {
+		return err
 	}
 	folders, err := s.repo.ListTrashedFoldersTop(ctx, ws.ID)
 	if err != nil {
 		return err
 	}
+	var folderIDs []string
 	for _, folder := range folders {
 		ids, err := s.repo.CollectSubtreeIDs(ctx, folder.ID, false)
 		if err != nil {
 			return err
 		}
-		_ = s.repo.DeleteFoldersByIDs(ctx, ws.ID, ids)
+		folderIDs = append(folderIDs, ids...)
+	}
+	if err := s.repo.DeleteFoldersByIDs(ctx, ws.ID, folderIDs); err != nil {
+		return err
 	}
 	s.audit.Write(ctx, userID, "disk.trash.empty", ws.ID)
 	return nil
+}
+
+func (s *DiskService) purgeFolderTree(ctx context.Context, workspaceID, folderID string, includeDeleted bool) error {
+	folderIDs, err := s.repo.CollectSubtreeIDs(ctx, folderID, !includeDeleted)
+	if err != nil {
+		return err
+	}
+	files, err := s.repo.ListFilesInFolders(ctx, workspaceID, folderIDs, includeDeleted)
+	if err != nil {
+		return err
+	}
+	if err := s.purgeFiles(ctx, workspaceID, files); err != nil {
+		return err
+	}
+	return s.repo.DeleteFoldersByIDs(ctx, workspaceID, folderIDs)
+}
+
+func (s *DiskService) purgeFiles(ctx context.Context, workspaceID string, files []model.DiskFile) error {
+	if len(files) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(files))
+	ids := make([]string, 0, len(files))
+	for _, f := range files {
+		if strings.TrimSpace(f.S3Key) != "" {
+			keys = append(keys, f.S3Key)
+		}
+		ids = append(ids, f.ID)
+	}
+	if err := s.storage.DeleteObjects(ctx, keys); err != nil {
+		if errors.Is(err, ErrStorageNotConfigured) {
+			return err
+		}
+		return ErrDiskStorageDelete
+	}
+	return s.repo.DeleteFilesByIDs(ctx, workspaceID, ids)
 }
 
 func validateDiskName(name string) error {
@@ -730,10 +759,4 @@ func duplicateName(name string) string {
 		return name[:i] + " (копия)" + name[i:]
 	}
 	return name + " (копия)"
-}
-
-func newTrashBatch() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }

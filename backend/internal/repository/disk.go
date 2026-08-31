@@ -178,6 +178,38 @@ func (r *DiskRepository) DeleteFilePermanent(ctx context.Context, workspaceID, f
 		RETURNING `+diskFileCols, fileID, workspaceID))
 }
 
+func (r *DiskRepository) DeleteFilesByIDs(ctx context.Context, workspaceID string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `DELETE FROM workspace_files WHERE workspace_id = $1 AND id = ANY($2::uuid[])`, workspaceID, ids)
+	return err
+}
+
+func (r *DiskRepository) ListFilesInFolders(ctx context.Context, workspaceID string, folderIDs []string, includeDeleted bool) ([]model.DiskFile, error) {
+	if len(folderIDs) == 0 {
+		return nil, nil
+	}
+	q := `SELECT ` + diskFileCols + ` FROM workspace_files WHERE workspace_id = $1 AND folder_id = ANY($2::uuid[])`
+	if !includeDeleted {
+		q += ` AND deleted_at IS NULL`
+	}
+	rows, err := r.pool.Query(ctx, q, workspaceID, folderIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.DiskFile
+	for rows.Next() {
+		f, err := scanDiskFile(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *f)
+	}
+	return out, rows.Err()
+}
+
 func (r *DiskRepository) ListTrashedFilesTop(ctx context.Context, workspaceID string) ([]model.DiskFile, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT `+diskFileCols+` FROM workspace_files f
@@ -203,27 +235,6 @@ func (r *DiskRepository) ListTrashedFilesTop(ctx context.Context, workspaceID st
 		out = append(out, *f)
 	}
 	return out, rows.Err()
-}
-
-func (r *DiskRepository) CollectFileIDsInFolder(ctx context.Context, folderID string, activeOnly bool) ([]string, error) {
-	q := `SELECT id FROM workspace_files WHERE folder_id = $1`
-	if activeOnly {
-		q += ` AND deleted_at IS NULL`
-	}
-	rows, err := r.pool.Query(ctx, q, folderID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
 }
 
 func (r *DiskRepository) ListFilesByIDs(ctx context.Context, workspaceID string, ids []string, includeDeleted bool) ([]model.DiskFile, error) {

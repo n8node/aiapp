@@ -32,3 +32,20 @@ func TestBuildDiskS3Key(t *testing.T) {
 		t.Fatal("unsafe")
 	}
 }
+
+func TestChunkStrings(t *testing.T) {
+	got := chunkStrings([]string{"a", "b", "c", "d", "e"}, 2)
+	if len(got) != 3 || len(got[2]) != 1 || got[2][0] != "e" {
+		t.Fatalf("got %#v", got)
+	}
+	if chunkStrings(nil, 10) != nil {
+		t.Fatal("empty")
+	}
+}
+
+func TestUniqueS3Keys(t *testing.T) {
+	got := uniqueS3Keys([]string{"", "a", "b", "a", "  "})
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("got %#v", got)
+	}
+}

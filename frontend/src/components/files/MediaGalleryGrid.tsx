@@ -17,7 +17,7 @@ export function MediaGalleryGrid({
   mode: MediaGridMode;
   selected: Set<string>;
   onOpen: (file: WorkspaceFile) => void;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (id: string, event?: { shiftKey: boolean }) => void;
 }) {
   const gridClass =
     mode === "compact"
@@ -46,7 +46,7 @@ export function MediaGalleryGrid({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleSelect(f.id);
+                onToggleSelect(f.id, e);
               }}
               className={cn(
                 "absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 bg-surface/90 shadow-sm",

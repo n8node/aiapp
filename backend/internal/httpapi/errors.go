@@ -99,6 +99,8 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusConflict, "name_taken", "Папка с таким именем уже есть"
 	case errors.Is(err, service.ErrDiskUploadSession):
 		return http.StatusBadRequest, "upload_session", "Загрузка не завершена. Повторите попытку."
+	case errors.Is(err, service.ErrDiskStorageDelete):
+		return http.StatusBadGateway, "storage_delete", "Не удалось удалить файл из хранилища. Повторите попытку."
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

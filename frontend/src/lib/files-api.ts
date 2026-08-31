@@ -245,17 +245,34 @@ export function openFile(id: string, disposition: "inline" | "attachment" = "att
 }
 
 export function bulkFiles(ids: string[], action: "delete" | "move" | "copy", folderId?: string | null) {
-  return diskData<{ ok: number; errors: { id: string; message: string }[] }>("/disk/files/bulk", {
-    method: "POST",
-    body: JSON.stringify({ ids, action, folder_id: folderId ?? null }),
-  });
+  return bulkInChunks(ids, (chunk) =>
+    diskData<{ ok: number; errors: { id: string; message: string }[] }>("/disk/files/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids: chunk, action, folder_id: folderId ?? null }),
+    }),
+  );
 }
 
 export function bulkFolders(ids: string[], action: "delete" | "move", folderId?: string | null) {
-  return diskData<{ ok: number; errors: { id: string; message: string }[] }>("/disk/folders/bulk", {
-    method: "POST",
-    body: JSON.stringify({ ids, action, folder_id: folderId ?? null }),
-  });
+  return bulkInChunks(ids, (chunk) =>
+    diskData<{ ok: number; errors: { id: string; message: string }[] }>("/disk/folders/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids: chunk, action, folder_id: folderId ?? null }),
+    }),
+  );
+}
+
+async function bulkInChunks(
+  ids: string[],
+  send: (chunk: string[]) => Promise<{ ok: number; errors: { id: string; message: string }[] }>,
+) {
+  const merged = { ok: 0, errors: [] as { id: string; message: string }[] };
+  for (let i = 0; i < ids.length; i += 200) {
+    const part = await send(ids.slice(i, i + 200));
+    merged.ok += part.ok;
+    if (part.errors?.length) merged.errors.push(...part.errors);
+  }
+  return merged;
 }
 
 export function listTrash() {

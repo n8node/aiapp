@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent } from "react";
 import {
+  Check,
   Clock,
   Copy,
   Download,
@@ -24,7 +25,25 @@ import { FileDetailPanel } from "@/components/files/FileDetailPanel";
 import { MoveTargetDialog, type MoveTarget } from "@/components/files/MoveTargetDialog";
 import { MediaGalleryGrid, type MediaGridMode } from "@/components/files/MediaGalleryGrid";
 import { UploadProgressPanel } from "@/components/files/UploadProgressPanel";
+import { NameDialog } from "@/components/files/NameDialog";
+import { ConfirmDialog } from "@/components/files/ConfirmDialog";
+import { FileToolbar } from "@/components/files/FileToolbar";
 import { cn } from "@/lib/cn";
+import {
+  DEFAULT_VISIBLE_TABS,
+  EMPTY_FILTERS,
+  classifyFile,
+  filterFiles,
+  filterFolders,
+  filtersActive,
+  kindLabel,
+  loadVisibleTabs,
+  saveVisibleTabs,
+  sortFiles,
+  sortFolders,
+  type FileKind,
+  type FileViewFilters,
+} from "@/lib/file-view";
 import {
   type FilesSection,
   type FolderBreadcrumb,
@@ -36,6 +55,7 @@ import {
   copyFile,
   createFolder,
   deleteFile,
+  deleteFolder,
   emptyTrash,
   fetchFolderBreadcrumbs,
   formatBytes,
@@ -80,6 +100,30 @@ function formatFileTime(iso: string) {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+function SelectBox({
+  on,
+  label,
+  onClick,
+}: {
+  on: boolean;
+  label: string;
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+        on ? "border-accent bg-accent text-white" : "border-zinc-300 hover:border-accent/50",
+      )}
+    >
+      {on ? <Check className="h-3 w-3" /> : null}
+    </button>
+  );
+}
+
 export function FileManager({
   workspace,
 }: {
@@ -100,10 +144,29 @@ export function FileManager({
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [mediaGridMode, setMediaGridMode] = useState<MediaGridMode>("compact");
   const [dragging, setDragging] = useState(false);
+  const [filters, setFilters] = useState<FileViewFilters>(EMPTY_FILTERS);
+  const [visibleTabs, setVisibleTabs] = useState<FileKind[]>(DEFAULT_VISIBLE_TABS);
+  const [folderDialog, setFolderDialog] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ kind: "file" | "folder"; id: string; current: string } | null>(
+    null,
+  );
+  const [confirm, setConfirm] = useState<
+    | { mode: "delete-selected" }
+    | { mode: "delete-file"; id: string }
+    | { mode: "delete-folder"; id: string }
+    | { mode: "empty-trash" }
+    | { mode: "purge-selected" }
+    | { mode: "purge-file"; id: string }
+    | { mode: "purge-folder"; id: string }
+    | null
+  >(null);
+  const [dialogBusy, setDialogBusy] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(new Map<string, AbortController>());
   const dragDepth = useRef(0);
   const uploadLock = useRef(false);
+  const lastClickedId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!workspace) {
@@ -146,13 +209,23 @@ export function FileManager({
   }, [refresh]);
 
   useEffect(() => {
+    setVisibleTabs(loadVisibleTabs());
+  }, []);
+
+  useEffect(() => {
     setFolderId(null);
     setFolderTrail([]);
     setSelected(new Set());
     setSelectedKinds(new Map());
     setUploadJobs([]);
     setPreviewFileId(null);
+    setFilters(EMPTY_FILTERS);
   }, [workspace?.id]);
+
+  useEffect(() => {
+    setFilters(EMPTY_FILTERS);
+    lastClickedId.current = null;
+  }, [section]);
 
   useEffect(() => {
     if (loading) return;
@@ -179,7 +252,43 @@ export function FileManager({
     };
   }, [section, folderId]);
 
-  const toggleSelect = (id: string, kind: "file" | "folder") => {
+  const visibleFolders = useMemo(
+    () => sortFolders(filterFolders(folders, filters), filters),
+    [folders, filters],
+  );
+  const visibleFiles = useMemo(
+    () => sortFiles(filterFiles(files, filters), filters),
+    [files, filters],
+  );
+  const visibleIds = useMemo(
+    () => [...visibleFolders.map((f) => f.id), ...visibleFiles.map((f) => f.id)],
+    [visibleFolders, visibleFiles],
+  );
+
+  const applyRangeSelect = (id: string, kind: "file" | "folder", shiftKey: boolean) => {
+    const prevClick = lastClickedId.current;
+    lastClickedId.current = id;
+    const kindOf = (itemId: string): "file" | "folder" =>
+      visibleFolders.some((f) => f.id === itemId) ? "folder" : "file";
+    if (shiftKey && prevClick && prevClick !== id) {
+      const a = visibleIds.indexOf(prevClick);
+      const b = visibleIds.indexOf(id);
+      if (a >= 0 && b >= 0) {
+        const [from, to] = a < b ? [a, b] : [b, a];
+        const slice = visibleIds.slice(from, to + 1);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const itemId of slice) next.add(itemId);
+          return next;
+        });
+        setSelectedKinds((prev) => {
+          const next = new Map(prev);
+          for (const itemId of slice) next.set(itemId, kindOf(itemId));
+          return next;
+        });
+        return;
+      }
+    }
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -192,6 +301,21 @@ export function FileManager({
       else next.set(id, kind);
       return next;
     });
+  };
+
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelected(new Set());
+      setSelectedKinds(new Map());
+      return;
+    }
+    setSelected(new Set(visibleIds));
+    const kinds = new Map<string, "file" | "folder">();
+    for (const fo of visibleFolders) kinds.set(fo.id, "folder");
+    for (const f of visibleFiles) kinds.set(f.id, "file");
+    setSelectedKinds(kinds);
   };
 
   const selectedSize = useMemo(() => {
@@ -272,51 +396,80 @@ export function FileManager({
     for (const c of abortRef.current.values()) c.abort();
   };
 
-  const handleCreateFolder = async () => {
-    const name = window.prompt("Имя папки");
-    if (!name?.trim()) return;
+  const handleCreateFolder = async (name: string) => {
+    setDialogBusy(true);
+    setDialogError(null);
     try {
-      await createFolder(name.trim(), folderId);
+      await createFolder(name, folderId);
+      setFolderDialog(false);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка");
+      setDialogError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setDialogBusy(false);
     }
   };
 
-  const handleRename = async (kind: "file" | "folder", id: string, current: string) => {
-    const name = window.prompt("Новое имя", current);
-    if (!name?.trim() || name.trim() === current) return;
+  const handleRenameConfirm = async (name: string) => {
+    if (!renameTarget) return;
+    setDialogBusy(true);
+    setDialogError(null);
     try {
-      if (kind === "file") await renameFile(id, name.trim());
-      else await renameFolder(id, name.trim());
+      if (renameTarget.kind === "file") await renameFile(renameTarget.id, name);
+      else await renameFolder(renameTarget.id, name);
+      setRenameTarget(null);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка");
+      setDialogError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setDialogBusy(false);
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (selected.size === 0) return;
-    const fileIds = [...selected].filter((id) => selectedKinds.get(id) === "file");
-    const folderIds = [...selected].filter((id) => selectedKinds.get(id) === "folder");
-    if (section === "trash") {
-      if (!window.confirm(`Удалить выбранное навсегда (${selected.size})?`)) return;
-      try {
-        for (const id of fileIds) await permanentDeleteTrash(id, "file");
-        for (const id of folderIds) await permanentDeleteTrash(id, "folder");
-        await refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка удаления");
+  const runConfirm = async () => {
+    if (!confirm) return;
+    setDialogBusy(true);
+    setError(null);
+    try {
+      switch (confirm.mode) {
+        case "delete-selected": {
+          const fileIds = [...selected].filter((id) => selectedKinds.get(id) === "file");
+          const folderIds = [...selected].filter((id) => selectedKinds.get(id) === "folder");
+          if (fileIds.length) await bulkFiles(fileIds, "delete");
+          if (folderIds.length) await bulkFolders(folderIds, "delete");
+          break;
+        }
+        case "delete-file":
+          await deleteFile(confirm.id);
+          setPreviewFileId((cur) => (cur === confirm.id ? null : cur));
+          break;
+        case "delete-folder":
+          await deleteFolder(confirm.id);
+          break;
+        case "empty-trash":
+          await emptyTrash();
+          break;
+        case "purge-selected": {
+          const fileIds = [...selected].filter((id) => selectedKinds.get(id) === "file");
+          const folderIds = [...selected].filter((id) => selectedKinds.get(id) === "folder");
+          for (const id of fileIds) await permanentDeleteTrash(id, "file");
+          for (const id of folderIds) await permanentDeleteTrash(id, "folder");
+          break;
+        }
+        case "purge-file":
+          await permanentDeleteTrash(confirm.id, "file");
+          break;
+        case "purge-folder":
+          await permanentDeleteTrash(confirm.id, "folder");
+          break;
       }
-      return;
-    }
-    if (!window.confirm(`Удалить выбранное (${selected.size})?`)) return;
-    try {
-      if (fileIds.length) await bulkFiles(fileIds, "delete");
-      if (folderIds.length) await bulkFolders(folderIds, "delete");
+      setConfirm(null);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка удаления");
+      setConfirm(null);
+    } finally {
+      setDialogBusy(false);
     }
   };
 
@@ -356,11 +509,13 @@ export function FileManager({
     await handleRestore(fileIds, folderIds);
   };
 
-  const grouped = section !== "trash" && section !== "my-files" ? groupByDate(files) : null;
+  const grouped = section !== "trash" && section !== "my-files" ? groupByDate(visibleFiles) : null;
   const isUploading = uploadJobs.some((j) => j.status === "pending" || j.status === "uploading");
   const isGallerySection = section === "photos" || section === "videos";
   const previewFile = previewFileId ? (files.find((f) => f.id === previewFileId) ?? null) : null;
   const showDetail = Boolean(previewFile && section !== "trash");
+  const hasVisible = visibleFiles.length > 0 || visibleFolders.length > 0;
+  const hasAny = files.length > 0 || folders.length > 0;
 
   const myFilesTitle = useMemo(() => {
     if (!folderId) return "Файлы";
@@ -414,7 +569,10 @@ export function FileManager({
       {section === "my-files" ? (
         <button
           type="button"
-          onClick={() => void handleCreateFolder()}
+          onClick={() => {
+            setDialogError(null);
+            setFolderDialog(true);
+          }}
           className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm hover:bg-zinc-50"
         >
           <FolderPlus className="h-4 w-4" />
@@ -423,11 +581,7 @@ export function FileManager({
       ) : section === "trash" ? (
         <button
           type="button"
-          onClick={() => {
-            if (window.confirm("Очистить корзину полностью? Файлы будут удалены из хранилища навсегда.")) {
-              void emptyTrash().then(refresh);
-            }
-          }}
+          onClick={() => setConfirm({ mode: "empty-trash" })}
           className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
         >
           Очистить корзину
@@ -529,8 +683,8 @@ export function FileManager({
           crumbs={pageCrumbs}
           description={
             section === "trash"
-              ? "Удалённые файлы пространства. Очистка корзины удаляет их из хранилища навсегда."
-              : `Файлы пространства «${workspace.name}». Доступны всем участникам отдела.`
+              ? "Ранее удалённые объекты. Очистка корзины удаляет их из хранилища навсегда."
+              : `Файлы пространства «${workspace.name}». Удаление сразу стирает объект в хранилище.`
           }
           actions={headerActions}
         />
@@ -560,7 +714,7 @@ export function FileManager({
           />
         ) : loading ? (
           <p className="text-sm text-muted">Загрузка…</p>
-        ) : files.length === 0 && folders.length === 0 ? (
+        ) : !hasAny ? (
           <EmptyState
             title={section === "trash" ? "Корзина пуста" : "Нет файлов"}
             description={
@@ -581,29 +735,61 @@ export function FileManager({
             }
           />
         ) : (
+          <div className="space-y-4">
+            <FileToolbar
+              filters={filters}
+              visibleTabs={visibleTabs}
+              hideKindTabs={isGallerySection}
+              onChange={setFilters}
+              onVisibleTabsChange={(tabs) => {
+                setVisibleTabs(tabs);
+                saveVisibleTabs(tabs);
+              }}
+            />
+
+            {hasVisible ? (
+              <div className="flex items-center gap-2">
+                <SelectBox on={allVisibleSelected} label="Выбрать все" onClick={() => toggleSelectAll()} />
+                <button type="button" onClick={toggleSelectAll} className="text-sm text-muted hover:text-text">
+                  {allVisibleSelected ? "Снять выделение" : `Выбрать все (${visibleIds.length})`}
+                </button>
+              </div>
+            ) : null}
+
+            {!hasVisible ? (
+              <EmptyState
+                title="Ничего не найдено"
+                description="Сбросьте фильтры или выберите другую вкладку."
+                action={
+                  filtersActive(filters) ? (
+                    <button
+                      type="button"
+                      onClick={() => setFilters(EMPTY_FILTERS)}
+                      className="rounded-lg border border-border bg-surface px-3 py-2 text-sm hover:bg-zinc-50"
+                    >
+                      Сбросить фильтры
+                    </button>
+                  ) : undefined
+                }
+              />
+            ) : (
           <div className="space-y-6">
-            {section === "my-files" && folders.length > 0 ? (
+            {section !== "photos" && section !== "videos" && visibleFolders.length > 0 ? (
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                  Папки ({folders.length})
+                  Папки ({visibleFolders.length})
                 </h3>
                 <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                  {folders.map((fo) => (
+                  {visibleFolders.map((fo) => (
                     <div key={fo.id} className="group flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50">
+                      <SelectBox
+                        on={selected.has(fo.id)}
+                        label="Выбрать папку"
+                        onClick={(e) => applyRangeSelect(fo.id, "folder", e.shiftKey)}
+                      />
                       <button
                         type="button"
-                        onClick={() => toggleSelect(fo.id, "folder")}
-                        className={cn(
-                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                          selected.has(fo.id) ? "border-accent bg-accent" : "border-zinc-300 hover:border-accent/50",
-                        )}
-                        aria-label="Выбрать папку"
-                      >
-                        {selected.has(fo.id) ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFolderId(fo.id)}
+                        onClick={() => (section === "trash" ? undefined : setFolderId(fo.id))}
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-amber-50">
@@ -616,66 +802,55 @@ export function FileManager({
                           </p>
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        title="Переименовать"
-                        onClick={() => void handleRename("folder", fo.id, fo.name)}
-                        className="rounded p-1 text-muted opacity-0 hover:bg-zinc-100 group-hover:opacity-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      {section === "trash" ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            title="Восстановить"
+                            onClick={() => void handleRestore([], [fo.id])}
+                            className="rounded p-1 hover:bg-zinc-100"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Удалить навсегда"
+                            onClick={() => setConfirm({ mode: "purge-folder", id: fo.id })}
+                            className="rounded p-1 text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            title="Переименовать"
+                            onClick={() => {
+                              setDialogError(null);
+                              setRenameTarget({ kind: "folder", id: fo.id, current: fo.name });
+                            }}
+                            className="rounded p-1 text-muted hover:bg-zinc-100"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Удалить папку"
+                            onClick={() => setConfirm({ mode: "delete-folder", id: fo.id })}
+                            className="rounded p-1 text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </section>
             ) : null}
 
-            {section === "trash" && folders.length > 0 ? (
-              <div className="space-y-2">
-                {folders.map((fo) => (
-                  <div
-                    key={fo.id}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2 shadow-sm"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSelect(fo.id, "folder")}
-                      className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                        selected.has(fo.id) ? "border-accent bg-accent" : "border-zinc-300",
-                      )}
-                      aria-label="Выбрать папку"
-                    >
-                      {selected.has(fo.id) ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
-                    </button>
-                    <Folder className="h-5 w-5 text-amber-500" />
-                    <span className="flex-1 truncate text-sm font-medium">{fo.name}</span>
-                    <button
-                      type="button"
-                      title="Восстановить"
-                      onClick={() => void handleRestore([], [fo.id])}
-                      className="rounded p-1 hover:bg-zinc-100"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Удалить навсегда"
-                      onClick={() => {
-                        if (window.confirm("Удалить папку навсегда?")) {
-                          void permanentDeleteTrash(fo.id, "folder").then(refresh);
-                        }
-                      }}
-                      className="rounded p-1 text-red-500 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {(grouped ?? [["", files] as [string, WorkspaceFile[]]]).map(([label, groupFiles]) => (
+            {(grouped ?? [["", visibleFiles] as [string, WorkspaceFile[]]]).map(([label, groupFiles]) => (
               <section key={label || "all"}>
                 {section === "my-files" && groupFiles.length > 0 ? (
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -690,10 +865,27 @@ export function FileManager({
                     mode={mediaGridMode}
                     selected={selected}
                     onOpen={(f) => setPreviewFileId(f.id)}
-                    onToggleSelect={(id) => toggleSelect(id, "file")}
+                    onToggleSelect={(id, event) => applyRangeSelect(id, "file", Boolean(event?.shiftKey))}
                   />
-                ) : (
-                  <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                ) : groupFiles.length === 0 ? null : (
+                  <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                    <div className="hidden items-center gap-3 border-b border-border bg-zinc-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:flex">
+                      <span className="w-4" />
+                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setFilters((f) => ({ ...f, sort: "name", dir: f.sort === "name" && f.dir === "asc" ? "desc" : "asc" }))}>
+                        Имя
+                      </button>
+                      <button type="button" className="w-28 text-left" onClick={() => setFilters((f) => ({ ...f, sort: "type", dir: f.sort === "type" && f.dir === "asc" ? "desc" : "asc" }))}>
+                        Тип
+                      </button>
+                      <button type="button" className="w-24 text-left" onClick={() => setFilters((f) => ({ ...f, sort: "size", dir: f.sort === "size" && f.dir === "asc" ? "desc" : "asc" }))}>
+                        Размер
+                      </button>
+                      <button type="button" className="w-36 text-left" onClick={() => setFilters((f) => ({ ...f, sort: "date", dir: f.sort === "date" && f.dir === "asc" ? "desc" : "asc" }))}>
+                        Дата
+                      </button>
+                      <span className="w-24" />
+                    </div>
+                    <div className="divide-y divide-border">
                     {groupFiles.map((f) => (
                       <div
                         key={f.id}
@@ -702,17 +894,11 @@ export function FileManager({
                           previewFileId === f.id && "bg-accent/5",
                         )}
                       >
-                        <button
-                          type="button"
-                          onClick={() => toggleSelect(f.id, "file")}
-                          className={cn(
-                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                            selected.has(f.id) ? "border-accent bg-accent" : "border-zinc-300 hover:border-accent/50",
-                          )}
-                          aria-label="Выбрать файл"
-                        >
-                          {selected.has(f.id) ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
-                        </button>
+                        <SelectBox
+                          on={selected.has(f.id)}
+                          label="Выбрать файл"
+                          onClick={(e) => applyRangeSelect(f.id, "file", e.shiftKey)}
+                        />
                         <button
                           type="button"
                           onClick={() => section !== "trash" && setPreviewFileId(f.id)}
@@ -721,12 +907,17 @@ export function FileManager({
                           <FileIcon fileId={f.id} name={f.name} mimeType={f.mime_type} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{f.name}</p>
-                            <p className="text-xs text-muted">
+                            <p className="text-xs text-muted sm:hidden">
                               {formatBytes(f.size)} · {formatFileTime(f.created_at)}
                             </p>
                           </div>
                         </button>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                        <span className="hidden w-28 truncate text-xs text-muted sm:block">
+                          {kindLabel(classifyFile(f))}
+                        </span>
+                        <span className="hidden w-24 text-xs text-muted sm:block">{formatBytes(f.size)}</span>
+                        <span className="hidden w-36 text-xs text-muted lg:block">{formatFileTime(f.created_at)}</span>
+                        <div className="flex w-24 items-center justify-end gap-1 opacity-0 group-hover:opacity-100">
                           {section !== "trash" ? (
                             <>
                               <button
@@ -740,7 +931,10 @@ export function FileManager({
                               <button
                                 type="button"
                                 title="Переименовать"
-                                onClick={() => void handleRename("file", f.id, f.name)}
+                                onClick={() => {
+                                  setDialogError(null);
+                                  setRenameTarget({ kind: "file", id: f.id, current: f.name });
+                                }}
                                 className="rounded p-1.5 text-muted hover:bg-zinc-100"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -756,7 +950,7 @@ export function FileManager({
                               <button
                                 type="button"
                                 title="Удалить"
-                                onClick={() => void deleteFile(f.id).then(refresh)}
+                                onClick={() => setConfirm({ mode: "delete-file", id: f.id })}
                                 className="rounded p-1.5 text-red-500 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -775,11 +969,7 @@ export function FileManager({
                               <button
                                 type="button"
                                 title="Удалить навсегда"
-                                onClick={() => {
-                                  if (window.confirm("Удалить файл навсегда?")) {
-                                    void permanentDeleteTrash(f.id, "file").then(refresh);
-                                  }
-                                }}
+                                onClick={() => setConfirm({ mode: "purge-file", id: f.id })}
                                 className="rounded p-1.5 text-red-500 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -789,10 +979,13 @@ export function FileManager({
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
               </section>
             ))}
+          </div>
+            )}
           </div>
         )}
       </div>
@@ -802,14 +995,12 @@ export function FileManager({
           file={previewFile}
           onClose={() => setPreviewFileId(null)}
           onDownload={() => openFile(previewFile.id, "attachment")}
-          onRename={() => void handleRename("file", previewFile.id, previewFile.name)}
+          onRename={() => {
+            setDialogError(null);
+            setRenameTarget({ kind: "file", id: previewFile.id, current: previewFile.name });
+          }}
           onCopy={() => void copyFile(previewFile.id, folderId).then(refresh)}
-          onDelete={() =>
-            void deleteFile(previewFile.id).then(() => {
-              setPreviewFileId(null);
-              void refresh();
-            })
-          }
+          onDelete={() => setConfirm({ mode: "delete-file", id: previewFile.id })}
         />
       ) : null}
       </div>
@@ -845,7 +1036,7 @@ export function FileManager({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDeleteSelected()}
+                  onClick={() => setConfirm({ mode: "delete-selected" })}
                   className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1.5 text-sm text-white hover:bg-red-700"
                 >
                   <Trash2 className="h-4 w-4" /> Удалить
@@ -862,7 +1053,7 @@ export function FileManager({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDeleteSelected()}
+                  onClick={() => setConfirm({ mode: "purge-selected" })}
                   className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1.5 text-sm text-white hover:bg-red-700"
                 >
                   <Trash2 className="h-4 w-4" /> Удалить навсегда
@@ -892,6 +1083,54 @@ export function FileManager({
           onConfirm={handleMoveConfirm}
         />
       ) : null}
+
+      <NameDialog
+        open={folderDialog}
+        title="Новая папка"
+        description="Папка появится в текущем каталоге пространства."
+        confirmLabel="Создать"
+        placeholder="Например, Договоры"
+        submitting={dialogBusy}
+        error={dialogError}
+        onClose={() => setFolderDialog(false)}
+        onConfirm={handleCreateFolder}
+      />
+      <NameDialog
+        open={Boolean(renameTarget)}
+        title="Переименовать"
+        confirmLabel="Сохранить"
+        initialValue={renameTarget?.current ?? ""}
+        submitting={dialogBusy}
+        error={dialogError}
+        onClose={() => setRenameTarget(null)}
+        onConfirm={handleRenameConfirm}
+      />
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={
+          confirm?.mode === "empty-trash"
+            ? "Очистить корзину"
+            : confirm?.mode === "purge-selected" || confirm?.mode === "purge-file" || confirm?.mode === "purge-folder"
+              ? "Удалить навсегда"
+              : "Удалить"
+        }
+        description={
+          confirm?.mode === "empty-trash"
+            ? "Все файлы из корзины будут удалены из хранилища навсегда."
+            : confirm?.mode === "purge-selected" || confirm?.mode === "purge-file" || confirm?.mode === "purge-folder"
+              ? "Объекты будут удалены из хранилища без восстановления."
+              : confirm?.mode === "delete-folder" ||
+                  (confirm?.mode === "delete-selected" &&
+                    [...selected].some((id) => selectedKinds.get(id) === "folder"))
+                ? "Папка и все файлы внутри будут удалены из хранилища навсегда."
+                : "Файлы будут удалены из хранилища навсегда."
+        }
+        confirmLabel={confirm?.mode === "empty-trash" ? "Очистить" : "Удалить"}
+        danger
+        submitting={dialogBusy}
+        onClose={() => setConfirm(null)}
+        onConfirm={runConfirm}
+      />
     </div>
   );
 }

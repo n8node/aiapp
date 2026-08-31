@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/n8node/aiapp/internal/filesniff"
 	"github.com/n8node/aiapp/internal/model"
 )
@@ -272,11 +273,100 @@ func (o *ObjectStorage) DeleteObject(ctx context.Context, s3Key string) error {
 	if err != nil {
 		return err
 	}
-	_, err = client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(st.Bucket),
-		Key:    aws.String(s3Key),
+	return deleteS3Object(ctx, client, st.Bucket, s3Key)
+}
+
+func (o *ObjectStorage) DeleteObjects(ctx context.Context, keys []string) error {
+	keys = uniqueS3Keys(keys)
+	if len(keys) == 0 {
+		return nil
+	}
+	client, st, err := o.client(ctx)
+	if err != nil {
+		return err
+	}
+	for _, chunk := range chunkStrings(keys, 1000) {
+		objs := make([]types.ObjectIdentifier, 0, len(chunk))
+		for _, k := range chunk {
+			objs = append(objs, types.ObjectIdentifier{Key: aws.String(k)})
+		}
+		out, err := client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(st.Bucket),
+			Delete: &types.Delete{Objects: objs, Quiet: aws.Bool(false)},
+		})
+		if err != nil {
+			for _, k := range chunk {
+				if derr := deleteS3Object(ctx, client, st.Bucket, k); derr != nil {
+					return derr
+				}
+			}
+			continue
+		}
+		for _, e := range out.Errors {
+			code := ""
+			if e.Code != nil {
+				code = *e.Code
+			}
+			if code == "NoSuchKey" || code == "NotFound" {
+				continue
+			}
+			key := ""
+			if e.Key != nil {
+				key = *e.Key
+			}
+			if key == "" {
+				return fmt.Errorf("s3 delete failed")
+			}
+			if derr := deleteS3Object(ctx, client, st.Bucket, key); derr != nil {
+				return derr
+			}
+		}
+	}
+	return nil
+}
+
+func deleteS3Object(ctx context.Context, client *s3.Client, bucket, key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil
+	}
+	_, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
 	return err
+}
+
+func uniqueS3Keys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, k)
+	}
+	return out
+}
+
+func chunkStrings(items []string, size int) [][]string {
+	if size <= 0 || len(items) == 0 {
+		return nil
+	}
+	out := make([][]string, 0, (len(items)+size-1)/size)
+	for i := 0; i < len(items); i += size {
+		end := i + size
+		if end > len(items) {
+			end = len(items)
+		}
+		out = append(out, items[i:end])
+	}
+	return out
 }
 
 func encodeCopySource(bucket, key string) string {
