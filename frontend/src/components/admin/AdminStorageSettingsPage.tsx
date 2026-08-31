@@ -327,10 +327,10 @@ export function AdminStorageSettingsPage() {
         <div>
           <h2 className="text-base font-semibold">CORS для бакета</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Если клиент будет грузить файлы напрямую в S3 (presigned PUT), добавьте в бакет эту
-            конфигурацию для домена{" "}
-            <span className="font-medium text-slate-700">{domainHint}</span>. Для MinIO на том же
-            сервере CORS часто не нужен — загрузка пойдёт через API.
+            CORS для загрузки из кабинета записывается в бакет при «Проверке соединения» и при
+            первой загрузке файла. XML ниже — запасной вариант, если API провайдера не принимает
+            PutBucketCors. Домен:{" "}
+            <span className="font-medium text-slate-700">{domainHint}</span>.
           </p>
         </div>
         {corsXML ? <CopyBlock value={corsXML} /> : null}

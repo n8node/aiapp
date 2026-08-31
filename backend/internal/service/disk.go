@@ -84,6 +84,7 @@ func (s *DiskService) UploadInit(ctx context.Context, userID, sessionID string, 
 		return nil, err
 	}
 	s3Key := buildDiskS3Key(ws.ID)
+	_ = s.storage.EnsureBucketCORS(ctx)
 	presigned, err := s.storage.PresignPut(ctx, s3Key, req.MimeType, 15*time.Minute)
 	if err != nil {
 		return nil, err

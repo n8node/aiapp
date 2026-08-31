@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +21,8 @@ var (
 
 type ObjectStorage struct {
 	settings *StorageSettingsService
+	corsMu   sync.Mutex
+	corsOK   bool
 }
 
 func NewObjectStorage(settings *StorageSettingsService) *ObjectStorage {
@@ -62,13 +66,50 @@ func (o *ObjectStorage) PresignPut(ctx context.Context, s3Key, contentType strin
 	if err != nil {
 		return nil, err
 	}
-	headers := map[string]string{"Content-Type": contentType}
-	for k, vals := range out.SignedHeader {
-		if len(vals) > 0 {
-			headers[k] = vals[0]
-		}
+	return &PresignedUpload{
+		URL:     out.URL,
+		Headers: browserUploadHeaders(contentType, out.SignedHeader),
+	}, nil
+}
+
+func (o *ObjectStorage) EnsureBucketCORS(ctx context.Context) error {
+	if o.settings == nil || o.settings.cfg == nil {
+		return nil
 	}
-	return &PresignedUpload{URL: out.URL, Headers: headers}, nil
+	o.corsMu.Lock()
+	defer o.corsMu.Unlock()
+	if o.corsOK {
+		return nil
+	}
+	client, st, err := o.client(ctx)
+	if err != nil {
+		return err
+	}
+	origins := buildCORSOrigins(o.settings.cfg.CORSOrigins, o.settings.cfg.PublicAppURL)
+	if err := putBucketCORS(ctx, client, st.Bucket, origins); err != nil {
+		return err
+	}
+	o.corsOK = true
+	return nil
+}
+
+func browserUploadHeaders(contentType string, signed http.Header) map[string]string {
+	headers := map[string]string{}
+	for k, vals := range signed {
+		if len(vals) == 0 {
+			continue
+		}
+		lk := strings.ToLower(k)
+		switch {
+		case lk == "host", lk == "content-length", lk == "content-type", lk == "connection",
+			lk == "date", lk == "authorization", strings.HasPrefix(lk, "x-amz-checksum"),
+			lk == "x-amz-sdk-checksum-algorithm", strings.HasPrefix(lk, "amz-sdk-"):
+			continue
+		}
+		headers[k] = vals[0]
+	}
+	headers["Content-Type"] = contentType
+	return headers
 }
 
 func (o *ObjectStorage) PresignGet(ctx context.Context, s3Key, filename string, inline bool, expires time.Duration) (string, error) {

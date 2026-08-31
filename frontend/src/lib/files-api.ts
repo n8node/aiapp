@@ -117,16 +117,21 @@ export function putWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     for (const [key, value] of Object.entries(headers)) {
-      xhr.setRequestHeader(key, value);
+      if (isUnsafeUploadHeader(key)) continue;
+      try {
+        xhr.setRequestHeader(key, value);
+      } catch {
+        /* browsers reject Host / Content-Length */
+      }
     }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error("Не удалось загрузить файл в хранилище"));
+      else reject(new Error(uploadFailureMessage(xhr.status)));
     };
-    xhr.onerror = () => reject(new Error("Не удалось загрузить файл в хранилище"));
+    xhr.onerror = () => reject(new Error(uploadFailureMessage(0)));
     xhr.onabort = () => reject(new DOMException("Загрузка отменена", "AbortError"));
     const onAbort = () => xhr.abort();
     if (signal) {
@@ -138,6 +143,22 @@ export function putWithProgress(
     }
     xhr.send(file);
   });
+}
+
+function isUnsafeUploadHeader(name: string) {
+  return /^(host|content-length|connection|cookie|cookie2|origin|referer|date|via|keep-alive|te|trailer|transfer-encoding|upgrade|dnt|expect)$/i.test(
+    name,
+  );
+}
+
+function uploadFailureMessage(status: number) {
+  if (status === 0) {
+    return "Браузер не смог отправить файл в S3. Обычно это CORS: в админке нажмите «Проверка соединения».";
+  }
+  if (status === 403) {
+    return "S3 отклонил загрузку (нет прав или неверная подпись).";
+  }
+  return `Не удалось загрузить файл в хранилище (${status})`;
 }
 
 export async function uploadFile(

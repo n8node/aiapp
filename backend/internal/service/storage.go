@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/n8node/aiapp/internal/config"
 	"github.com/n8node/aiapp/internal/cryptoutil"
 	"github.com/n8node/aiapp/internal/model"
@@ -163,9 +164,17 @@ func (s *StorageSettingsService) TestConnection(ctx context.Context) (*model.Sto
 		_, _ = s.repo.Update(ctx, saved)
 	}
 
+	msg := fmt.Sprintf("Соединение успешно. Бакет «%s» доступен.", working)
+	origins := buildCORSOrigins(s.cfg.CORSOrigins, s.cfg.PublicAppURL)
+	if err := putBucketCORS(ctx, client, working, origins); err != nil {
+		msg += " CORS для загрузки из браузера записать не удалось — вставьте XML ниже в настройки бакета."
+	} else {
+		msg += " CORS для кабинета записан в бакет."
+	}
+
 	return &model.StorageTestResult{
 		OK:      true,
-		Message: fmt.Sprintf("Соединение успешно. Бакет «%s» доступен.", working),
+		Message: msg,
 	}, nil
 }
 
@@ -243,6 +252,26 @@ func buildCORSOrigins(allowlist []string, publicAppURL string) []string {
 		add("http://localhost")
 	}
 	return origins
+}
+
+func putBucketCORS(ctx context.Context, client *s3.Client, bucket string, origins []string) error {
+	bucket = strings.TrimSpace(bucket)
+	if client == nil || bucket == "" || len(origins) == 0 {
+		return nil
+	}
+	_, err := client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
+		Bucket: aws.String(bucket),
+		CORSConfiguration: &types.CORSConfiguration{
+			CORSRules: []types.CORSRule{{
+				AllowedHeaders: []string{"*"},
+				AllowedMethods: []string{"GET", "PUT", "POST", "DELETE", "HEAD"},
+				AllowedOrigins: origins,
+				ExposeHeaders:  []string{"ETag"},
+				MaxAgeSeconds:  aws.Int32(3600),
+			}},
+		},
+	})
+	return err
 }
 
 func buildCORSXML(origins []string) string {
