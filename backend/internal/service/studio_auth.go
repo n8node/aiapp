@@ -11,6 +11,7 @@ import (
 )
 
 var ErrStudioAuth = errors.New("studio auth failed")
+var ErrStudioUnavailable = errors.New("studio unavailable")
 
 const studioLoginUser = "unsloth"
 
@@ -25,7 +26,7 @@ func NewStudioAuthService(base, password string, auth *AuthService) *StudioAuthS
 	return &StudioAuthService{
 		base:     strings.TrimRight(strings.TrimSpace(base), "/"),
 		password: password,
-		http:     &http.Client{Timeout: 8 * time.Second},
+		http:     &http.Client{Timeout: 20 * time.Second},
 		auth:     auth,
 	}
 }
@@ -45,7 +46,7 @@ func (s *StudioAuthService) Session(ctx context.Context, userID string) (*Studio
 		return nil, ErrForbidden
 	}
 	if s.base == "" || s.password == "" {
-		return nil, ErrStudioAuth
+		return nil, ErrStudioUnavailable
 	}
 	body, err := json.Marshal(map[string]string{
 		"username": studioLoginUser,
@@ -61,7 +62,7 @@ func (s *StudioAuthService) Session(ctx context.Context, userID string) (*Studio
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.http.Do(req)
 	if err != nil {
-		return nil, ErrStudioAuth
+		return nil, ErrStudioUnavailable
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

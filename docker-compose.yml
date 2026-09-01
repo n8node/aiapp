@@ -82,17 +82,24 @@ services:
 
   unsloth-studio:
     image: unsloth/unsloth:latest
+    pull_policy: always
+    # Official image binds 127.0.0.1; nginx/backend need 0.0.0.0 (see entrypoint.sh).
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["bash /opt/rigintel/studio-entrypoint.sh"]
     environment:
       JUPYTER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       USER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
+      UNSLOTH_STUDIO_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       UNSLOTH_STUDIO_TRUST_FORWARDED: "1"
       UNSLOTH_STUDIO_DISABLE_PUBLIC_CHECK: "1"
       RIGINTEL_STUDIO_LOCALE: ru
     volumes:
       - unsloth_work:/workspace/work
       - unsloth_auth:/home/unsloth/.unsloth/auth
+      - ./unsloth/entrypoint.sh:/opt/rigintel/studio-entrypoint.sh:ro
     networks:
       - ml
+      - app
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
       interval: 15s
