@@ -8,3 +8,4 @@ ENV UNSLOTH_STUDIO_TRUST_FORWARDED=1 \
 
 COPY --chmod=755 overlay/ /opt/rigintel/studio/
 COPY --chmod=755 entrypoint.sh /opt/rigintel/studio-entrypoint.sh
+ENTRYPOINT ["/opt/rigintel/studio-entrypoint.sh"]

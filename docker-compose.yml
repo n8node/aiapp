@@ -81,11 +81,11 @@ services:
     restart: unless-stopped
 
   unsloth-studio:
-    image: unsloth/unsloth:latest
-    pull_policy: always
-    # Official image binds 127.0.0.1; nginx/backend need 0.0.0.0 (see entrypoint.sh).
-    entrypoint: ["/bin/bash", "-lc"]
-    command: ["bash /opt/rigintel/studio-entrypoint.sh"]
+    build:
+      context: ./unsloth
+      dockerfile: Dockerfile
+    image: rigintel/unsloth-studio:local
+    pull_policy: never
     environment:
       JUPYTER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       USER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
@@ -96,7 +96,6 @@ services:
     volumes:
       - unsloth_work:/workspace/work
       - unsloth_auth:/home/unsloth/.unsloth/auth
-      - ./unsloth/entrypoint.sh:/opt/rigintel/studio-entrypoint.sh:ro
     networks:
       - ml
       - app
