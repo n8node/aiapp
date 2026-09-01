@@ -92,8 +92,6 @@ services:
       JUPYTER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       USER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       UNSLOTH_STUDIO_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
-      STUDIO_HOME: /home/unsloth/.unsloth/studio
-      UNSLOTH_STUDIO_HOME: /home/unsloth/.unsloth/studio
       UNSLOTH_STUDIO_TRUST_FORWARDED: "1"
       UNSLOTH_STUDIO_DISABLE_PUBLIC_CHECK: "1"
       RIGINTEL_STUDIO_LOCALE: ru
@@ -107,7 +105,6 @@ services:
     command: ["unsloth", "studio", "-H", "0.0.0.0", "-p", "8000"]
     volumes:
       - unsloth_work:/workspace/work
-      - unsloth_auth:/home/unsloth/.unsloth/studio/auth
     networks:
       - ml
       - app

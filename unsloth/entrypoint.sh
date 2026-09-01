@@ -4,22 +4,36 @@ set -eu
 # Studio defaults to 127.0.0.1. Nginx and the Go API reach it via Docker DNS,
 # so it must bind 0.0.0.0 or every hop returns 502.
 LOCALE="${RIGINTEL_STUDIO_LOCALE:-ru}"
-# Upstream auth_root() is studio_root()/auth, not ~/.unsloth/auth.
-STUDIO_HOME="${UNSLOTH_STUDIO_HOME:-${STUDIO_HOME:-/home/unsloth/.unsloth/studio}}"
-export STUDIO_HOME
-export UNSLOTH_STUDIO_HOME="$STUDIO_HOME"
-AUTH_DIR="${UNSLOTH_STUDIO_AUTH_DIR:-${STUDIO_HOME}/auth}"
 AUTH_HOME="/home/unsloth/.unsloth"
+# Shell path for the installer binary only — do not export as UNSLOTH_STUDIO_HOME.
+# Forcing that env made Studio treat a volume-mounted tree as the install root and die (502).
+STUDIO_HOME="${STUDIO_HOME:-/home/unsloth/.unsloth/studio}"
 INSTALLER_BIN="${STUDIO_HOME}/unsloth_studio/bin/unsloth"
 DIST_STORE="/workspace/work/.rigintel-studio-frontend"
+AUTH_PERSIST="/workspace/work/.rigintel-studio-auth"
 
-mkdir -p "$AUTH_DIR" "$AUTH_HOME" /tmp/rigintel-studio /workspace/work 2>/dev/null || true
+mkdir -p "$AUTH_HOME" "$STUDIO_HOME" "$AUTH_PERSIST" /tmp/rigintel-studio /workspace/work 2>/dev/null || true
 
 printf '%s\n' "$LOCALE" > /tmp/rigintel-studio/locale
 printf '%s\n' "$LOCALE" > "$AUTH_HOME/rigintel_locale" || true
 
+# Docker volume on studio/auth hides installer files / is root-owned and Unsloth exits.
+# Keep auth.db on the writable work volume and point both known auth paths at it.
+for target in "$STUDIO_HOME/auth" "$AUTH_HOME/auth"; do
+  if [ -L "$target" ]; then
+    continue
+  fi
+  if [ -d "$target" ]; then
+    if [ -f "$target/auth.db" ] && [ ! -f "$AUTH_PERSIST/auth.db" ]; then
+      cp -a "$target/auth.db" "$AUTH_PERSIST/auth.db" || true
+    fi
+    rm -rf "$target" || true
+  fi
+  ln -s "$AUTH_PERSIST" "$target" || true
+done
+
 # Re-passing UNSLOTH_STUDIO_PASSWORD after auth.db exists is a hard process exit.
-if [ -f "$AUTH_DIR/auth.db" ]; then
+if [ -f "$AUTH_PERSIST/auth.db" ]; then
   unset UNSLOTH_STUDIO_PASSWORD
 fi
 
