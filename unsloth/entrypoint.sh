@@ -55,9 +55,11 @@ apply_outbound_proxy() {
         export http_proxy="$PROXY_URL"
         export https_proxy="$PROXY_URL"
         export ALL_PROXY="$PROXY_URL"
-        export NO_PROXY="localhost,127.0.0.1,backend,postgres,nginx,model-gateway,ai-runtime,unsloth-studio"
+        # Hub API (model list) already works from this host. Do not add hf.co:
+        # that suffix would also match us.aws.cdn.hf.co and skip the proxy.
+        export NO_PROXY="localhost,127.0.0.1,backend,postgres,nginx,model-gateway,ai-runtime,unsloth-studio,huggingface.co"
         export no_proxy="$NO_PROXY"
-        echo "Outbound HTTP proxy enabled for Hugging Face" >&2
+        echo "Outbound HTTP proxy enabled for Hugging Face CDN" >&2
       fi
       return 0
     fi

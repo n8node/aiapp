@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -120,31 +121,42 @@ func (s *OutboundProxyService) Test(ctx context.Context) (model.OutboundProxyTes
 	if proxyURL == "" {
 		return model.OutboundProxyTestResult{}, fmt.Errorf("%w: нет активного URL", ErrInvalidOutboundProxy)
 	}
-	client, err := httpClientForProxy(&http.Client{Timeout: 25 * time.Second}, proxyURL)
+	proxyClient, err := httpClientForProxy(&http.Client{Timeout: 25 * time.Second}, proxyURL)
 	if err != nil {
 		return model.OutboundProxyTestResult{}, fmt.Errorf("%w: %v", ErrInvalidOutboundProxy, err)
 	}
+	direct := &http.Client{Timeout: 20 * time.Second, Transport: directHTTPTransport()}
 
-	hub, err := s.probe(ctx, client, "https://huggingface.co/", true)
+	hub, err := s.probe(ctx, direct, "https://huggingface.co/", true)
 	if err != nil {
 		return model.OutboundProxyTestResult{
 			OK:      false,
-			Message: "Прокси не открыл huggingface.co: " + err.Error(),
+			Message: "huggingface.co с сервера недоступен напрямую (список моделей тоже не откроется): " + err.Error(),
 			Hub:     err.Error(),
 		}, nil
 	}
-	cdn, err := s.probe(ctx, client, "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF/resolve/main/Qwen3.6-27B-UD-Q4_K_XL.gguf", false)
+
+	cdnURL, err := s.resolveCDNURL(ctx, direct, "https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF/resolve/main/Qwen3.6-27B-UD-Q4_K_XL.gguf")
 	if err != nil {
 		return model.OutboundProxyTestResult{
 			OK:      false,
-			Message: "Hub через прокси отвечает, CDN/resolve — нет: " + err.Error(),
+			Message: "Hub открывается напрямую, редирект на CDN не получен: " + err.Error(),
+			Hub:     hub,
+			CDN:     err.Error(),
+		}, nil
+	}
+	cdn, err := s.probeRange(ctx, proxyClient, cdnURL)
+	if err != nil {
+		return model.OutboundProxyTestResult{
+			OK:      false,
+			Message: "Hub напрямую отвечает, CDN через прокси — нет: " + err.Error(),
 			Hub:     hub,
 			CDN:     err.Error(),
 		}, nil
 	}
 	return model.OutboundProxyTestResult{
 		OK:      true,
-		Message: "Прокси открывает Hugging Face. Токен модели берётся из настроек Studio. Перезапустите unsloth-studio, чтобы качание шло через прокси.",
+		Message: "Hub идёт напрямую (список моделей). Прокси открывает CDN. Перезапустите unsloth-studio.",
 		Hub:     hub,
 		CDN:     cdn,
 	}, nil
@@ -177,6 +189,90 @@ func (s *OutboundProxyService) probe(ctx context.Context, client *http.Client, r
 		return resp.Status, nil
 	}
 	return "", fmt.Errorf("HTTP %s", resp.Status)
+}
+
+func hostFromURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+func isHuggingFaceHubHost(host string) bool {
+	return host == "huggingface.co" || strings.HasSuffix(host, ".huggingface.co")
+}
+
+func (s *OutboundProxyService) resolveCDNURL(ctx context.Context, client *http.Client, rawURL string) (string, error) {
+	current := rawURL
+	for i := 0; i < 5; i++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, current, nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("User-Agent", "RigIntel-ProxyProbe/1.0")
+		probeClient := &http.Client{
+			Timeout:   20 * time.Second,
+			Transport: client.Transport,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		resp, err := probeClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+		loc := strings.TrimSpace(resp.Header.Get("Location"))
+		_ = resp.Body.Close()
+		if loc == "" {
+			return "", fmt.Errorf("нет редиректа на CDN: HTTP %s", resp.Status)
+		}
+		ref, err := url.Parse(current)
+		if err != nil {
+			return "", err
+		}
+		next, err := ref.Parse(loc)
+		if err != nil {
+			return "", err
+		}
+		current = next.String()
+		host := hostFromURL(current)
+		if host != "" && !isHuggingFaceHubHost(host) {
+			return current, nil
+		}
+	}
+	return "", fmt.Errorf("редирект не вышел на CDN")
+}
+
+func (s *OutboundProxyService) probeRange(ctx context.Context, client *http.Client, rawURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "RigIntel-ProxyProbe/1.0")
+	req.Header.Set("Range", "bytes=0-0")
+	probeClient := &http.Client{
+		Timeout:   25 * time.Second,
+		Transport: client.Transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := probeClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	_, _ = io.CopyN(io.Discard, resp.Body, 2048)
+	host := hostFromURL(rawURL)
+	label := resp.Status
+	if host != "" {
+		label = host + " " + resp.Status
+	}
+	if (resp.StatusCode >= 200 && resp.StatusCode < 400) || resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return label, nil
+	}
+	return "", fmt.Errorf("%s", label)
 }
 
 func (s *OutboundProxyService) activeURL(cfg model.OutboundProxySettings) string {

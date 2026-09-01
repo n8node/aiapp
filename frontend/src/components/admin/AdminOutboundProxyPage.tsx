@@ -54,7 +54,7 @@ export function AdminOutboundProxyPage() {
         proxy_urls: settings.proxy_urls,
       });
       setSettings({ ...empty, ...res.data, proxy_urls: res.data.proxy_urls ?? [] });
-      setSuccess("Сохранено. Перезапустите контейнер unsloth-studio, чтобы качание моделей шло через прокси.");
+      setSuccess("Сохранено. Перезапустите unsloth-studio: список моделей останется прямым, файлы пойдут через прокси.");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Не удалось сохранить");
     } finally {
@@ -83,8 +83,9 @@ export function AdminOutboundProxyPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Исходящий прокси</h1>
         <p className="mt-1 text-sm text-slate-500">
-          HTTP CONNECT для Hugging Face CDN (загрузка GGUF в Unsloth Studio). Токен Hub задаётся в
-          Studio → Настройки, сюда его дублировать не нужно.
+          HTTP CONNECT только для файлов на CDN Hugging Face (GGUF в Unsloth Studio). Список моделей
+          и API huggingface.co идут с сервера напрямую, как раньше. Токен Hub задаётся в Studio →
+          Настройки, сюда его дублировать не нужно.
         </p>
       </div>
 
@@ -106,8 +107,9 @@ export function AdminOutboundProxyPage() {
       <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-medium text-slate-900">Прокси для Hugging Face</h2>
         <p className="text-xs text-slate-500">
-          Сайт huggingface.co с сервера открывается, раздача файлов на us.aws.cdn.hf.co — нет. Тот же
-          HTTP-прокси, что для Telegram в POSTILKA: http://user:pass@host:port.
+          huggingface.co с сервера открывается, раздача на us.aws.cdn.hf.co — нет. Прокси не должен
+          перехватывать Hub (иначе список моделей зависает). Тот же HTTP-прокси, что для Telegram в
+          POSTILKA: http://user:pass@host:port.
         </p>
 
         <label className="flex items-center gap-2 text-sm">
@@ -117,7 +119,7 @@ export function AdminOutboundProxyPage() {
             onChange={(e) => patch({ proxy_enabled: e.target.checked })}
             className="rounded border-slate-300"
           />
-          Включить прокси для запросов Studio к Hugging Face
+          Включить прокси для загрузки файлов с CDN Hugging Face
         </label>
 
         <div>

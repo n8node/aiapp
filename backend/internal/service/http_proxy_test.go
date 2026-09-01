@@ -42,9 +42,17 @@ func TestMaskProxyURLForErrorHidesCredentials(t *testing.T) {
 	}
 }
 
-func TestProxyOrderPutsActiveFirst(t *testing.T) {
-	got := proxyOrder("http://b:3128", []string{"http://a:3128", "http://b:3128"})
-	if len(got) != 2 || got[0] != "http://b:3128" || got[1] != "http://a:3128" {
-		t.Fatalf("got %v", got)
+func TestIsHuggingFaceHubHost(t *testing.T) {
+	if !isHuggingFaceHubHost("huggingface.co") || !isHuggingFaceHubHost("cdn-lfs.huggingface.co") {
+		t.Fatal("hub hosts should match")
+	}
+	if isHuggingFaceHubHost("us.aws.cdn.hf.co") || isHuggingFaceHubHost("hf.co") || isHuggingFaceHubHost("cas-bridge.xethub.hf.co") {
+		t.Fatal("CDN hosts must not match hub NO_PROXY")
+	}
+}
+
+func TestHostFromURL(t *testing.T) {
+	if got := hostFromURL("https://US.AWS.CDN.HF.CO/path?sig=secret"); got != "us.aws.cdn.hf.co" {
+		t.Fatalf("got %q", got)
 	}
 }
