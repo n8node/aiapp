@@ -4,30 +4,22 @@ set -eu
 # Studio defaults to 127.0.0.1. Nginx and the Go API reach it via Docker DNS,
 # so it must bind 0.0.0.0 or every hop returns 502.
 LOCALE="${RIGINTEL_STUDIO_LOCALE:-ru}"
-AUTH_DIR="${UNSLOTH_STUDIO_AUTH_DIR:-/home/unsloth/.unsloth/auth}"
-AUTH_HOME="${UNSLOTH_STUDIO_HOME:-/home/unsloth/.unsloth}"
-# Upstream STUDIO_HOME is ~/.unsloth/studio; do not reuse AUTH_HOME for it.
-STUDIO_HOME="${STUDIO_HOME:-/home/unsloth/.unsloth/studio}"
+# Upstream auth_root() is studio_root()/auth, not ~/.unsloth/auth.
+STUDIO_HOME="${UNSLOTH_STUDIO_HOME:-${STUDIO_HOME:-/home/unsloth/.unsloth/studio}}"
+export STUDIO_HOME
+export UNSLOTH_STUDIO_HOME="$STUDIO_HOME"
+AUTH_DIR="${UNSLOTH_STUDIO_AUTH_DIR:-${STUDIO_HOME}/auth}"
+AUTH_HOME="/home/unsloth/.unsloth"
 INSTALLER_BIN="${STUDIO_HOME}/unsloth_studio/bin/unsloth"
 DIST_STORE="/workspace/work/.rigintel-studio-frontend"
 
-mkdir -p "$AUTH_DIR" /tmp/rigintel-studio /workspace/work 2>/dev/null || true
+mkdir -p "$AUTH_DIR" "$AUTH_HOME" /tmp/rigintel-studio /workspace/work 2>/dev/null || true
 
 printf '%s\n' "$LOCALE" > /tmp/rigintel-studio/locale
-if [ -d "$AUTH_HOME" ]; then
-  printf '%s\n' "$LOCALE" > "$AUTH_HOME/rigintel_locale" || true
-fi
+printf '%s\n' "$LOCALE" > "$AUTH_HOME/rigintel_locale" || true
 
-# Re-passing UNSLOTH_STUDIO_PASSWORD after auth exists is a hard process exit.
-auth_seeded=0
-if [ -d "$AUTH_DIR" ]; then
-  for f in "$AUTH_DIR"/* "$AUTH_DIR"/.[!.]*; do
-    [ -e "$f" ] || continue
-    auth_seeded=1
-    break
-  done
-fi
-if [ "$auth_seeded" = 1 ]; then
+# Re-passing UNSLOTH_STUDIO_PASSWORD after auth.db exists is a hard process exit.
+if [ -f "$AUTH_DIR/auth.db" ]; then
   unset UNSLOTH_STUDIO_PASSWORD
 fi
 
