@@ -5,6 +5,7 @@ import {
   ApiError,
   fetchAdminUsers,
   setAdminUserBlocked,
+  setAdminUserStudioAccess,
   type User,
 } from "@/lib/api";
 
@@ -36,6 +37,15 @@ export function AdminUsersPage() {
     return () => window.clearTimeout(t);
   }, [load]);
 
+  async function toggleStudio(user: User) {
+    try {
+      await setAdminUserStudioAccess(user.id, !user.studio_access);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось изменить доступ к Studio");
+    }
+  }
+
   async function toggleBlock(user: User) {
     try {
       await setAdminUserBlocked(user.id, !user.is_blocked);
@@ -65,6 +75,7 @@ export function AdminUsersPage() {
               <th className="px-4 py-2">Пользователь</th>
               <th className="px-4 py-2">2FA</th>
               <th className="px-4 py-2">Роль</th>
+              <th className="px-4 py-2">Studio</th>
               <th className="px-4 py-2">Статус</th>
               <th className="px-4 py-2" />
             </tr>
@@ -72,7 +83,7 @@ export function AdminUsersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td className="px-4 py-6 text-slate-500" colSpan={5}>
+                <td className="px-4 py-6 text-slate-500" colSpan={6}>
                   Загрузка…
                 </td>
               </tr>
@@ -85,6 +96,19 @@ export function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3">{u.totp_enabled ? "Вкл" : "Нет"}</td>
                   <td className="px-4 py-3">{u.is_platform_admin ? "Суперадмин" : "Пользователь"}</td>
+                  <td className="px-4 py-3">
+                    {u.is_platform_admin ? (
+                      "Всегда"
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void toggleStudio(u)}
+                        className="rounded-lg border border-slate-200 px-3 py-1 text-xs"
+                      >
+                        {u.studio_access ? "Есть" : "Нет"}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-3">{u.is_blocked ? "Блок" : "Активен"}</td>
                   <td className="px-4 py-3 text-right">
                     {!u.is_platform_admin && (

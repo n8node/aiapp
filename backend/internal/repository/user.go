@@ -22,14 +22,14 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
 }
 
-const userCols = `id, email, password_hash, name, locale, timezone, is_platform_admin, is_blocked,
+const userCols = `id, email, password_hash, name, locale, timezone, is_platform_admin, studio_access, is_blocked,
 email_verified_at, totp_secret_encrypted, totp_enabled_at, registered_via_invite_id, created_at, updated_at`
 
 func scanUser(row pgx.Row) (*model.UserRecord, error) {
 	var u model.UserRecord
 	err := row.Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Locale, &u.Timezone,
-		&u.IsPlatformAdmin, &u.IsBlocked, &u.EmailVerifiedAt, &u.TotpSecretEncrypted,
+		&u.IsPlatformAdmin, &u.StudioAccess, &u.IsBlocked, &u.EmailVerifiedAt, &u.TotpSecretEncrypted,
 		&u.TotpEnabledAt, &u.RegisteredViaInviteID, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -121,6 +121,17 @@ func (r *UserRepository) SetBlocked(ctx context.Context, id string, blocked bool
 	return nil
 }
 
+func (r *UserRepository) SetStudioAccess(ctx context.Context, id string, access bool) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET studio_access = $2, updated_at = NOW() WHERE id = $1`, id, access)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *UserRepository) SetTotpSecret(ctx context.Context, id, enc string) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE users SET totp_secret_encrypted = $2, totp_enabled_at = NULL, updated_at = NOW()
@@ -174,7 +185,7 @@ func (r *UserRepository) List(ctx context.Context, q string, blocked *bool, admi
 	offsetArg := n + 1
 	args = append(args, limit, offset)
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, email, name, locale, timezone, is_platform_admin, is_blocked,
+		SELECT id, email, name, locale, timezone, is_platform_admin, studio_access, is_blocked,
 		       email_verified_at, totp_enabled_at, created_at, updated_at
 		FROM users WHERE `+clause+`
 		ORDER BY created_at DESC
@@ -188,7 +199,7 @@ func (r *UserRepository) List(ctx context.Context, q string, blocked *bool, admi
 		var u model.User
 		var totpAt *time.Time
 		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Locale, &u.Timezone, &u.IsPlatformAdmin,
-			&u.IsBlocked, &u.EmailVerifiedAt, &totpAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.StudioAccess, &u.IsBlocked, &u.EmailVerifiedAt, &totpAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		u.TotpEnabled = totpAt != nil

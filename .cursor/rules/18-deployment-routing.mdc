@@ -10,7 +10,7 @@ alwaysApply: false
 - Docker Compose is acceptable for the initial single-node application; keep manifests structured for later service separation.
 - Only Nginx publishes 80/443. PostgreSQL, MySQL, MinIO, NATS, Redis/Dragonfly, parsers, model servers, Studio, and admin tools remain internal.
 - Routing: `/` and WordPress paths → WordPress; `/app` → Next.js; `/app/api/v1` → Go backend.
-- Do not expose Unsloth Studio publicly. If web access is required, place it behind separate admin authentication and network controls.
+- Do not expose Unsloth Studio as an unauthenticated public site. Serve it only through the holding portal behind the RigIntel session. Which roles see full Studio is a product choice, not a license limit.
 - TLS redirects HTTP, enables HSTS after validation, uses modern ciphers, and automates renewal without exposing secrets.
 - Apply request/body/time limits per route; streaming chat disables proxy buffering and has bounded idle/total timeouts.
 - Containers run non-root where supported, read-only filesystem where practical, dropped capabilities, no privileged mode, and scoped volumes.

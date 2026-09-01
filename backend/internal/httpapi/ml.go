@@ -18,10 +18,6 @@ func NewModelHandler(models *service.ModelService) *ModelHandler {
 	return &ModelHandler{models: models}
 }
 
-func (h *ModelHandler) AuthGate(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNoContent)
-}
-
 func (h *ModelHandler) List(w http.ResponseWriter, r *http.Request) {
 	if h.models == nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос")

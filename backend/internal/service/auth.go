@@ -468,6 +468,48 @@ func (s *AuthService) SetUserBlocked(ctx context.Context, actorID, userID string
 	return nil
 }
 
+func (s *AuthService) SetStudioAccess(ctx context.Context, actorID, userID string, access bool) error {
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.IsPlatformAdmin {
+		return ErrForbidden
+	}
+	if err := s.users.SetStudioAccess(ctx, userID, access); err != nil {
+		return err
+	}
+	action := "auth.user.studio.revoke"
+	if access {
+		action = "auth.user.studio.grant"
+	}
+	s.audit.Write(ctx, actorID, action, userID)
+	return nil
+}
+
+func (s *AuthService) UILocale(ctx context.Context) string {
+	v, err := s.settings.Get(ctx, uiLocaleKey)
+	if err != nil {
+		return DefaultUILocale()
+	}
+	if n := NormalizeUILocale(v); n != "" {
+		return n
+	}
+	return DefaultUILocale()
+}
+
+func (s *AuthService) SetUILocale(ctx context.Context, actorID, locale string) (string, error) {
+	n := NormalizeUILocale(locale)
+	if n == "" {
+		return "", ErrInvalidInput
+	}
+	if err := s.settings.Set(ctx, uiLocaleKey, n); err != nil {
+		return "", err
+	}
+	s.audit.Write(ctx, actorID, "ui.locale.update", n)
+	return n, nil
+}
+
 func (s *AuthService) EnsureSuperAdmin(ctx context.Context, email, pass, name string) (*model.User, bool, error) {
 	email = emaildomain.Normalize(email)
 	if !emaildomain.IsReservedSuperadmin(email) {

@@ -1,18 +1,12 @@
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/layout/AppShell";
+import { TrainingPage } from "@/components/training/TrainingPage";
 import { getMe } from "@/lib/auth-server";
 
-export default async function CabinetLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function TrainingRoute() {
   const me = await getMe();
   if (!me) redirect("/auth/login");
-  if (!me.user.totp_enabled) redirect("/auth/2fa");
-
   return (
-    <AppShell
+    <TrainingPage
       user={{
         id: me.user.id,
         email: me.user.email,
@@ -23,10 +17,7 @@ export default async function CabinetLayout({
         totp_enabled: me.user.totp_enabled,
         created_at: "",
       }}
-      workspace={me.workspace}
-      workspaces={me.workspaces}
-    >
-      {children}
-    </AppShell>
+      uiLocale={me.ui_locale || "ru"}
+    />
   );
 }

@@ -68,6 +68,8 @@ func main() {
 	kbRepo := repository.NewKnowledgeRepository(handle)
 	kbSvc := service.NewKnowledgeService(kbRepo, mlRepo, diskSvc, authSvc, audit, gw)
 	vectorizeWorker := service.NewVectorizeWorker(kbRepo, diskRepo, objectStore, extractor, gw, logger)
+	trainRepo := repository.NewTrainingRepository(handle)
+	trainSvc := service.NewTrainingService(trainRepo, authSvc, audit)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
 		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
@@ -82,7 +84,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Training: trainSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Minute,

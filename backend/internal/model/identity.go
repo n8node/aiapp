@@ -9,12 +9,17 @@ type User struct {
 	Locale                string     `json:"locale"`
 	Timezone              string     `json:"timezone"`
 	IsPlatformAdmin       bool       `json:"is_platform_admin"`
+	StudioAccess          bool       `json:"studio_access"`
 	IsBlocked             bool       `json:"is_blocked"`
 	EmailVerifiedAt       *time.Time `json:"email_verified_at,omitempty"`
 	TotpEnabled           bool       `json:"totp_enabled"`
 	RegisteredViaInviteID *string    `json:"registered_via_invite_id,omitempty"`
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
+}
+
+func (u User) CanAccessStudio() bool {
+	return u.IsPlatformAdmin || u.StudioAccess
 }
 
 type UserRecord struct {

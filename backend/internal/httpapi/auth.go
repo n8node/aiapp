@@ -97,6 +97,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"workspace":        active,
 			"active_workspace": active,
 			"workspaces":       workspaces,
+			"ui_locale":        h.auth.UILocale(r.Context()),
 		},
 	})
 }
@@ -197,6 +198,68 @@ func (h *AuthHandler) AdminBlockUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h *AuthHandler) AuthGate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authn.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Не авторизован")
+		return
+	}
+	user, err := h.auth.RequireUser(r.Context(), userID)
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	if !user.CanAccessStudio() {
+		writeError(w, http.StatusForbidden, "forbidden", "Недостаточно прав")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AuthHandler) AdminSetStudioAccess(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authn.UserID(r.Context())
+	id := chi.URLParam(r, "userID")
+	var req struct {
+		StudioAccess bool `json:"studio_access"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "Проверьте введённые данные")
+		return
+	}
+	if err := h.auth.SetStudioAccess(r.Context(), actor, id, req.StudioAccess); err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h *AuthHandler) AdminGetLocale(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		"locale":  h.auth.UILocale(r.Context()),
+		"locales": service.UILocaleCatalog(),
+	}})
+}
+
+func (h *AuthHandler) AdminSetLocale(w http.ResponseWriter, r *http.Request) {
+	actor, _ := authn.UserID(r.Context())
+	var req struct {
+		Locale string `json:"locale"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_input", "Проверьте введённые данные")
+		return
+	}
+	locale, err := h.auth.SetUILocale(r.Context(), actor, req.Locale)
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		"locale":  locale,
+		"locales": service.UILocaleCatalog(),
+	}})
 }
 
 func (h *AuthHandler) AdminIssueInvites(w http.ResponseWriter, r *http.Request) {

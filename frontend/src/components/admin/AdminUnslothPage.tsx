@@ -17,8 +17,8 @@ export function AdminUnslothPage() {
       <div className="mb-3">
         <h1 className="text-2xl font-semibold tracking-tight">Unsloth Studio</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Изолированный инженерный контур: загрузка моделей, обучение LoRA/QLoRA, экспорт. Не является шлюзом
-          кабинета и не копируется в приложение. Доступ только у администратора платформы.
+          Изолированный инженерный контур поверх RigIntel-сессии: загрузка моделей, обучение LoRA/QLoRA, экспорт.
+          Не является шлюзом кабинета. Доступ: администратор платформы или пользователь с правом Studio.
         </p>
         {reachable === false ? (
           <p className="mt-2 text-sm text-amber-700">

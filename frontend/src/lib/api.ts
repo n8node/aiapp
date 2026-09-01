@@ -15,6 +15,7 @@ export type User = {
   email: string;
   name: string;
   is_platform_admin: boolean;
+  studio_access?: boolean;
   is_blocked: boolean;
   totp_enabled: boolean;
   created_at: string;
@@ -31,6 +32,7 @@ export type MeData = {
   user: User;
   workspace: Workspace | null;
   workspaces: Workspace[];
+  ui_locale?: string;
 };
 
 export type Invite = {
@@ -374,5 +376,85 @@ export function updateAdminStorageSettings(payload: StorageAdminUpdateRequest) {
 export function testAdminStorageConnection() {
   return apiFetch<{ data: StorageTestResult }>("/admin/storage-settings/test", {
     method: "POST",
+  });
+}
+
+export function setAdminUserStudioAccess(userID: string, studioAccess: boolean) {
+  return apiFetch(`/admin/users/${userID}/studio`, {
+    method: "POST",
+    body: JSON.stringify({ studio_access: studioAccess }),
+  });
+}
+
+export type UILocaleOption = { code: string; label: string };
+
+export function fetchAdminUILocale() {
+  return apiFetch<{ data: { locale: string; locales: UILocaleOption[] } }>("/admin/ui-locale");
+}
+
+export function saveAdminUILocale(locale: string) {
+  return apiFetch<{ data: { locale: string; locales: UILocaleOption[] } }>("/admin/ui-locale", {
+    method: "PUT",
+    body: JSON.stringify({ locale }),
+  });
+}
+
+export type TrainingRequest = {
+  id: string;
+  workspace_id: string;
+  requested_by_user_id: string;
+  requester_email?: string;
+  title: string;
+  purpose: string;
+  dataset_note: string;
+  base_model: string;
+  status: string;
+  review_note?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export function fetchTrainingRequests() {
+  return apiFetch<{ data: { requests: TrainingRequest[]; total: number } }>("/training-requests");
+}
+
+export function createTrainingRequest(payload: {
+  title: string;
+  purpose: string;
+  dataset_note: string;
+  base_model: string;
+}) {
+  return apiFetch<{ data: TrainingRequest }>("/training-requests", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function submitTrainingRequest(id: string) {
+  return apiFetch<{ data: TrainingRequest }>(`/training-requests/${id}/submit`, { method: "POST" });
+}
+
+export function cancelTrainingRequest(id: string) {
+  return apiFetch<{ data: TrainingRequest }>(`/training-requests/${id}/cancel`, { method: "POST" });
+}
+
+export function fetchAdminTrainingRequests(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch<{ data: { requests: TrainingRequest[]; total: number } }>(
+    `/admin/training-requests${qs}`,
+  );
+}
+
+export function approveAdminTrainingRequest(id: string, note = "") {
+  return apiFetch<{ data: TrainingRequest }>(`/admin/training-requests/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function rejectAdminTrainingRequest(id: string, note = "") {
+  return apiFetch<{ data: TrainingRequest }>(`/admin/training-requests/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
   });
 }

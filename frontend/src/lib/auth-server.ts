@@ -13,10 +13,12 @@ export type ServerMe = {
     email: string;
     name: string;
     is_platform_admin: boolean;
+    studio_access?: boolean;
     totp_enabled: boolean;
   };
   workspace: ServerWorkspace | null;
   workspaces: ServerWorkspace[];
+  ui_locale?: string;
 };
 
 export async function getMe(): Promise<ServerMe | null> {
@@ -37,5 +39,6 @@ export async function getMe(): Promise<ServerMe | null> {
     user: data.user,
     workspace: data.workspace ?? null,
     workspaces: data.workspaces ?? [],
+    ui_locale: data.ui_locale,
   };
 }

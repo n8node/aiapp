@@ -23,6 +23,7 @@ type Dependencies struct {
 	Documents  *service.DocumentService
 	Models     *service.ModelService
 	Knowledge  *service.KnowledgeService
+	Training   *service.TrainingService
 	Tokens     *authn.JWT
 }
 
@@ -37,6 +38,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	docsH := NewDocumentHandler(deps.Documents)
 	modelH := NewModelHandler(deps.Models)
 	kbH := NewKnowledgeHandler(deps.Knowledge)
+	trainH := NewTrainingHandler(deps.Training)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -101,16 +103,25 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Delete("/knowledge-bases/{kbID}", kbH.Delete)
 				r.Post("/knowledge-bases/{kbID}/vectorize", kbH.Vectorize)
 				r.Post("/knowledge-bases/{kbID}/search", kbH.Search)
+				r.Get("/training-requests", trainH.List)
+				r.Post("/training-requests", trainH.Create)
+				r.Get("/training-requests/{requestID}", trainH.Get)
+				r.Post("/training-requests/{requestID}/submit", trainH.Submit)
+				r.Post("/training-requests/{requestID}/cancel", trainH.Cancel)
+				r.Get("/admin/auth-gate", authH.AuthGate)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)
 					r.Post("/admin/users/{userID}/block", authH.AdminBlockUser)
+					r.Post("/admin/users/{userID}/studio", authH.AdminSetStudioAccess)
 					r.Get("/admin/invites", authH.AdminListInvites)
 					r.Post("/admin/invites", authH.AdminIssueInvites)
 					r.Post("/admin/invites/delete", authH.AdminDeleteInvites)
 					r.Post("/admin/invites/{inviteID}/revoke", authH.AdminRevokeInvite)
 					r.Get("/admin/auth-domains", authH.AdminGetDomains)
 					r.Put("/admin/auth-domains", authH.AdminSetDomains)
+					r.Get("/admin/ui-locale", authH.AdminGetLocale)
+					r.Put("/admin/ui-locale", authH.AdminSetLocale)
 					r.Get("/admin/bitrix", bitrixH.Status)
 					r.Put("/admin/bitrix", bitrixH.Save)
 					r.Post("/admin/bitrix/test", bitrixH.Test)
@@ -125,11 +136,13 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Get("/admin/storage-settings", storageH.Get)
 					r.Put("/admin/storage-settings", storageH.Save)
 					r.Post("/admin/storage-settings/test", storageH.Test)
-					r.Get("/admin/auth-gate", modelH.AuthGate)
 					r.Get("/admin/models", modelH.List)
 					r.Post("/admin/models", modelH.Create)
 					r.Post("/admin/models/{modelID}/action", modelH.Action)
 					r.Get("/admin/models/runtime", modelH.Runtime)
+					r.Get("/admin/training-requests", trainH.AdminList)
+					r.Post("/admin/training-requests/{requestID}/approve", trainH.AdminApprove)
+					r.Post("/admin/training-requests/{requestID}/reject", trainH.AdminReject)
 				})
 			})
 		})

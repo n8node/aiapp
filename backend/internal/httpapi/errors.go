@@ -131,6 +131,10 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusNotFound, "knowledge_not_found", "База знаний не найдена"
 	case errors.Is(err, service.ErrVectorizeBusy):
 		return http.StatusConflict, "vectorize_busy", "Векторизация этой коллекции уже выполняется"
+	case errors.Is(err, service.ErrTrainingNotFound):
+		return http.StatusNotFound, "training_not_found", "Заявка на обучение не найдена"
+	case errors.Is(err, service.ErrTrainingInvalidState):
+		return http.StatusConflict, "invalid_state", "Заявку в этом статусе нельзя изменить"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

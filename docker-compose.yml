@@ -80,10 +80,17 @@ services:
     restart: unless-stopped
 
   unsloth-studio:
-    image: unsloth/unsloth:latest
+    build:
+      context: ./unsloth
+      dockerfile: Dockerfile
+    image: rigintel/unsloth-studio:local
     environment:
       JUPYTER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       USER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
+      UNSLOTH_STUDIO_TRUST_FORWARDED: "1"
+      UNSLOTH_STUDIO_DISABLE_PUBLIC_CHECK: "1"
+      UNSLOTH_STUDIO_NO_AUTH: "1"
+      RIGINTEL_STUDIO_LOCALE: ru
     volumes:
       - unsloth_work:/workspace/work
       - unsloth_auth:/home/unsloth/.unsloth/auth

@@ -98,7 +98,7 @@ export function AdminModelsPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unsloth Studio</p>
           <p className="mt-1 text-sm font-medium">{studio?.reachable ? "Доступен" : "Недоступен"}</p>
-          <p className="text-xs text-slate-500">Открывается в разделе Unsloth, только для администратора</p>
+          <p className="text-xs text-slate-500">Открывается в разделе Unsloth. Право выдаётся в карточке пользователя.</p>
         </div>
       </div>
 

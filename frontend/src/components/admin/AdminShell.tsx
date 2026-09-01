@@ -12,6 +12,7 @@ const nav = [
       { href: "/admin/users", label: "Пользователи" },
       { href: "/admin/invites", label: "Инвайт-ключи" },
       { href: "/admin/auth-settings", label: "Домены почты" },
+      { href: "/admin/locale", label: "Язык интерфейса" },
       { href: "/admin/bitrix", label: "Битрикс24" },
       { href: "/admin/workspaces", label: "Пространства" },
       { href: "/admin/storage-settings", label: "S3 — хранилище" },
@@ -21,6 +22,7 @@ const nav = [
     label: "Модели",
     items: [
       { href: "/admin/models", label: "Реестр" },
+      { href: "/admin/training", label: "Заявки на обучение" },
       { href: "/admin/unsloth", label: "Unsloth Studio" },
     ],
   },

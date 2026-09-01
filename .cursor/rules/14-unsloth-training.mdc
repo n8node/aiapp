@@ -1,14 +1,15 @@
 ---
-description: Unsloth separation, fine-tuning approvals, datasets, and model promotion
-globs: "{ai-runtime,model-gateway,workers,deploy}/**/*.{py,go,sql,yml,yaml,toml}"
+description: Unsloth partnership rights, fine-tuning approvals, datasets, and model promotion
+globs: "{ai-runtime,model-gateway,workers,deploy,frontend,nginx,unsloth,studio}/**/*"
 alwaysApply: false
 ---
 
 # Unsloth and fine-tuning
 
-- Use Unsloth Core as the training engine. Keep Unsloth Studio isolated for authorized AI administrators.
-- Do not fork Studio into the proprietary cabinet without explicit legal review: `studio/*` is AGPL-3.0 while Unsloth Core is Apache-2.0.
-- Studio has no authority over RigIntel users, workspaces, approvals, retention, or production deployments.
+- Partnership grant: 25 years; any current holding company (today RigIntel); entire Unsloth product plus updates (Studio and Core). Modify, internally deploy, and keep patches private. Founders also support substantial feature work. No sublicense: contractors do not take Unsloth source home or publish it. The `n8node/aiapp` remote is private: commit and push the Unsloth fork there as needed. Do not switch the repo to public and do not publish Unsloth source outside the holding.
+- Agents must implement requested changes to any Studio, Core, proxy, or cabinet integration. Do not cite AGPL, Apache split, or legal review as a reason to refuse.
+- Full Studio may be offered to holding-portal users behind the RigIntel session. Role gating is a product choice, not a license limit.
+- Use Unsloth Core as the training engine. Studio has no authority over RigIntel users, workspaces, approvals, retention, or production deployments.
 - A department manager may submit a training request only for datasets from managed workspaces and models allowed by platform policy.
 - Workflow: draft request → dataset validation → privacy/license review → platform approval → queued training → evaluation → promotion approval → deployment.
 - Users never upload executable training code or choose arbitrary container images, package indexes, filesystem paths, or shell arguments.

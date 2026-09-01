@@ -21,7 +21,7 @@ alwaysApply: true
 - Cross-service communication uses versioned HTTP contracts for queries and durable events/jobs for long work.
 - PostgreSQL is the source of truth for business state; MinIO stores blobs; vector indexes are derived data.
 - Every external provider, parser, model server, and enterprise system is behind an interface and registry.
-- Unsloth Studio is an isolated engineering tool, not the user cabinet, identity system, job queue, or production gateway.
+- Unsloth Studio and Core may be forked, rewritten, and embedded in the holding portal. Studio is still not the identity system, job queue, or production gateway: Go keeps auth, tenancy, approvals, audit, and promotion; serving stays on the model gateway.
 - Prefer a module inside the existing service until separate dependencies, scaling, blast radius, or release cadence justify extraction.
 - Record a short ADR before adding a backend language, database, broker, vector engine, or orchestration framework.
 - No direct imports across bounded-context internals; share explicit contracts and small common primitives only.
