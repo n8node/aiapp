@@ -26,6 +26,7 @@ type Config struct {
 	GatewayURL         string   `env:"GATEWAY_URL"`
 	GatewayToken       string   `env:"GATEWAY_TOKEN"`
 	StudioURL          string   `env:"STUDIO_URL"`
+	StudioPassword     string   `env:"UNSLOTH_PASSWORD"`
 }
 
 func Load() (*Config, error) {
@@ -44,6 +45,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.GatewayToken == "" {
 		cfg.GatewayToken = cfg.JWTSecret
+	}
+	if cfg.StudioPassword == "" {
+		cfg.StudioPassword = cfg.JWTSecret
 	}
 	cfg.ExtractURL = strings.TrimRight(strings.TrimSpace(cfg.ExtractURL), "/")
 	cfg.GatewayURL = strings.TrimRight(strings.TrimSpace(cfg.GatewayURL), "/")

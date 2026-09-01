@@ -135,6 +135,8 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusNotFound, "training_not_found", "Заявка на обучение не найдена"
 	case errors.Is(err, service.ErrTrainingInvalidState):
 		return http.StatusConflict, "invalid_state", "Заявку в этом статусе нельзя изменить"
+	case errors.Is(err, service.ErrStudioAuth):
+		return http.StatusBadGateway, "studio_auth", "Не удалось войти в Studio. Проверьте пароль контейнера."
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

@@ -1,5 +1,9 @@
 (() => {
   const STORAGE_KEY = "unsloth_locale";
+  const AUTH_TOKEN_KEY = "unsloth_auth_token";
+  const AUTH_REFRESH_TOKEN_KEY = "unsloth_auth_refresh_token";
+  const ONBOARDING_DONE_KEY = "unsloth_onboarding_done";
+  const AUTH_MUST_CHANGE_PASSWORD_KEY = "unsloth_auth_must_change_password";
   const DEFAULT_LOCALE = "ru";
 
   function applyLocale(locale) {
@@ -27,14 +31,35 @@
     doc.head.appendChild(el);
   }
 
-  function boot() {
-    const path = window.location.pathname;
-    if (path === "/login" || path === "/onboarding" || path.startsWith("/login/") || path.startsWith("/onboarding/")) {
-      window.location.replace("/hub");
-      return;
+  function storeStudioSession(data) {
+    if (!data || !data.access_token || !data.refresh_token) return false;
+    localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
+    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, data.refresh_token);
+    localStorage.setItem(ONBOARDING_DONE_KEY, "1");
+    if (data.must_change_password) {
+      localStorage.setItem(AUTH_MUST_CHANGE_PASSWORD_KEY, "1");
+    } else {
+      localStorage.removeItem(AUTH_MUST_CHANGE_PASSWORD_KEY);
     }
-    if (path === "/change-password" || path.startsWith("/change-password/")) {
-      window.location.replace("/app/settings");
+    return true;
+  }
+
+  async function bootstrapStudioAuth() {
+    if (localStorage.getItem(AUTH_TOKEN_KEY)) return false;
+    const res = await fetch("/app/api/v1/studio/session", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return false;
+    const body = await res.json();
+    return storeStudioSession(body && body.data);
+  }
+
+  async function boot() {
+    const path = window.location.pathname;
+    if (path === "/app" || path.startsWith("/app/")) {
+      window.location.replace("/hub");
       return;
     }
     applyLocale(DEFAULT_LOCALE);
@@ -46,11 +71,19 @@
         if (locale) applyLocale(locale);
       })
       .catch(() => undefined);
+    try {
+      const ready = await bootstrapStudioAuth();
+      if (ready && path !== "/hub" && path !== "/chat") {
+        window.location.replace("/hub");
+      }
+    } catch {
+      /* keep Studio's own login if bootstrap fails */
+    }
   }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else {
-    boot();
+    void boot();
   }
 })();

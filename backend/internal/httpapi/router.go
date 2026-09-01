@@ -24,6 +24,7 @@ type Dependencies struct {
 	Models     *service.ModelService
 	Knowledge  *service.KnowledgeService
 	Training   *service.TrainingService
+	StudioAuth *service.StudioAuthService
 	Tokens     *authn.JWT
 }
 
@@ -39,6 +40,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	modelH := NewModelHandler(deps.Models)
 	kbH := NewKnowledgeHandler(deps.Knowledge)
 	trainH := NewTrainingHandler(deps.Training)
+	studioH := NewStudioHandler(deps.StudioAuth)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -109,6 +111,7 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Post("/training-requests/{requestID}/submit", trainH.Submit)
 				r.Post("/training-requests/{requestID}/cancel", trainH.Cancel)
 				r.Get("/admin/auth-gate", authH.AuthGate)
+				r.Post("/studio/session", studioH.Session)
 				r.Group(func(r chi.Router) {
 					r.Use(requireAdmin(deps.Auth))
 					r.Get("/admin/users", authH.AdminUsers)
