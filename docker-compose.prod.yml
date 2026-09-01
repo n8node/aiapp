@@ -41,7 +41,13 @@ services:
         max-file: "3"
 
   unsloth-studio:
-    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     logging:
       driver: json-file
       options:
