@@ -81,10 +81,7 @@ services:
     restart: unless-stopped
 
   unsloth-studio:
-    build:
-      context: ./unsloth
-      dockerfile: Dockerfile
-    image: rigintel/unsloth-studio:local
+    image: unsloth/unsloth:latest
     environment:
       JUPYTER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
       USER_PASSWORD: ${UNSLOTH_PASSWORD:-${JWT_SECRET}}
@@ -96,6 +93,12 @@ services:
       - unsloth_auth:/home/unsloth/.unsloth/auth
     networks:
       - ml
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
     restart: unless-stopped
 
   frontend:
