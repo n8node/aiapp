@@ -16,6 +16,7 @@ const nav = [
       { href: "/admin/bitrix", label: "Битрикс24" },
       { href: "/admin/workspaces", label: "Пространства" },
       { href: "/admin/storage-settings", label: "S3 — хранилище" },
+      { href: "/admin/outbound-proxy", label: "Исходящий прокси" },
     ],
   },
   {

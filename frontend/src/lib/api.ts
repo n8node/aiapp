@@ -379,6 +379,41 @@ export function testAdminStorageConnection() {
   });
 }
 
+export type OutboundProxySettings = {
+  proxy_enabled: boolean;
+  proxy_active_url: string;
+  proxy_urls: string[];
+  active_masked?: string;
+};
+
+export type OutboundProxyTestResult = {
+  ok: boolean;
+  message: string;
+  hub: string;
+  cdn: string;
+};
+
+export function fetchAdminOutboundProxy() {
+  return apiFetch<{ data: OutboundProxySettings }>("/admin/outbound-proxy");
+}
+
+export function saveAdminOutboundProxy(payload: {
+  proxy_enabled: boolean;
+  proxy_active_url: string;
+  proxy_urls: string[];
+}) {
+  return apiFetch<{ data: OutboundProxySettings }>("/admin/outbound-proxy", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function testAdminOutboundProxy() {
+  return apiFetch<{ data: OutboundProxyTestResult }>("/admin/outbound-proxy/test", {
+    method: "POST",
+  });
+}
+
 export function setAdminUserStudioAccess(userID: string, studioAccess: boolean) {
   return apiFetch(`/admin/users/${userID}/studio`, {
     method: "POST",

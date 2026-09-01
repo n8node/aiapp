@@ -145,6 +145,12 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusServiceUnavailable, "studio_unavailable", "Studio сейчас не отвечает"
 	case errors.Is(err, service.ErrStudioAuth):
 		return http.StatusServiceUnavailable, "studio_auth", "Не удалось войти в Studio. Проверьте пароль контейнера."
+	case errors.Is(err, service.ErrInvalidOutboundProxy):
+		return http.StatusBadRequest, "invalid_proxy", "Укажите HTTP-прокси вида http://user:pass@host:port"
+	case errors.Is(err, service.ErrOutboundProxyNotEnabled):
+		return http.StatusBadRequest, "proxy_disabled", "Сначала включите и сохраните прокси"
+	case errors.Is(err, service.ErrInternalUnauthorized):
+		return http.StatusUnauthorized, "unauthorized", "Не авторизован"
 	default:
 		return http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос"
 	}

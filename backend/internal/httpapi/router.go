@@ -26,6 +26,7 @@ type Dependencies struct {
 	Training   *service.TrainingService
 	Chat       *service.ChatService
 	StudioAuth *service.StudioAuthService
+	Outbound   *service.OutboundProxyService
 	Tokens     *authn.JWT
 }
 
@@ -43,6 +44,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	trainH := NewTrainingHandler(deps.Training)
 	chatH := NewChatHandler(deps.Chat)
 	studioH := NewStudioHandler(deps.StudioAuth)
+	outboundH := NewOutboundProxyHandler(deps.Outbound)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -64,6 +66,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Post("/auth/login", authH.Login)
 		r.Post("/auth/logout", authH.Logout)
 		r.Post("/auth/invite/verify", authH.VerifyInvite)
+		r.Get("/internal/outbound-proxy", outboundH.InternalGet)
 
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(deps.Tokens, deps.Auth))
@@ -153,6 +156,9 @@ func NewRouter(deps Dependencies) http.Handler {
 					r.Post("/admin/models", modelH.Create)
 					r.Post("/admin/models/{modelID}/action", modelH.Action)
 					r.Get("/admin/models/runtime", modelH.Runtime)
+					r.Get("/admin/outbound-proxy", outboundH.Get)
+					r.Put("/admin/outbound-proxy", outboundH.Save)
+					r.Post("/admin/outbound-proxy/test", outboundH.Test)
 					r.Get("/admin/training-requests", trainH.AdminList)
 					r.Post("/admin/training-requests/{requestID}/approve", trainH.AdminApprove)
 					r.Post("/admin/training-requests/{requestID}/reject", trainH.AdminReject)

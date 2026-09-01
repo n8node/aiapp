@@ -73,6 +73,7 @@ func main() {
 	chatRepo := repository.NewChatRepository(handle)
 	chatSvc := service.NewChatService(chatRepo, kbRepo, mlRepo, authSvc, audit, gw)
 	studioAuth := service.NewStudioAuthService(cfg.StudioURL, cfg.StudioPassword, authSvc)
+	outboundSvc := service.NewOutboundProxyService(settings, audit, cfg.GatewayToken)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
 		if _, created, err := authSvc.EnsureSuperAdmin(ctx, cfg.SuperadminEmail, cfg.SuperadminPassword, cfg.SuperadminName); err != nil {
@@ -87,7 +88,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Training: trainSvc, Chat: chatSvc, StudioAuth: studioAuth, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Training: trainSvc, Chat: chatSvc, StudioAuth: studioAuth, Outbound: outboundSvc, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Minute,
