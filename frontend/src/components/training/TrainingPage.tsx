@@ -188,7 +188,7 @@ export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string 
               Открыть Studio
             </Link>
           ) : (
-            <a href="/hub" className="text-accent hover:underline">
+            <a href="/chat" className="text-accent hover:underline">
               Открыть Studio
             </a>
           )}

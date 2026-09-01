@@ -5,16 +5,23 @@
   const ONBOARDING_DONE_KEY = "unsloth_onboarding_done";
   const AUTH_MUST_CHANGE_PASSWORD_KEY = "unsloth_auth_must_change_password";
   const DEFAULT_LOCALE = "ru";
+  const HOME = "/chat";
 
-  function applyLocale(locale) {
+  function pinLocale(locale) {
     const value = locale || DEFAULT_LOCALE;
     try {
       localStorage.setItem(STORAGE_KEY, value);
     } catch {
       /* ignore quota / private mode */
     }
-    document.documentElement.lang = value === "ru" ? "ru" : value;
+    if (document.documentElement) {
+      document.documentElement.lang = value;
+    }
   }
+
+  // Studio default preference is "auto" (browser language). Set ru before
+  // the Vite module bundle calls initializeLocale().
+  pinLocale(DEFAULT_LOCALE);
 
   function hideLocaleControls(root) {
     const doc = root || document;
@@ -25,6 +32,7 @@
     el.textContent = `
       [data-locale-picker],
       [data-testid="locale-select"],
+      [data-testid="language-select"],
       select[name="locale"],
       label[for="locale"] { display: none !important; }
     `;
@@ -59,22 +67,31 @@
   async function boot() {
     const path = window.location.pathname;
     if (path === "/app" || path.startsWith("/app/")) {
-      window.location.replace("/hub");
+      window.location.replace(HOME);
       return;
     }
-    applyLocale(DEFAULT_LOCALE);
+    if (path === "/hub" || path === "/hub/") {
+      window.location.replace(HOME);
+      return;
+    }
     hideLocaleControls(document);
-    fetch("/app/api/v1/auth/me", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body) => {
-        const locale = body && body.data && body.data.ui_locale;
-        if (locale) applyLocale(locale);
-      })
-      .catch(() => undefined);
+    try {
+      const res = await fetch("/app/api/v1/auth/me", { credentials: "include" });
+      const body = res.ok ? await res.json() : null;
+      const locale = body && body.data && body.data.ui_locale;
+      if (locale && locale !== localStorage.getItem(STORAGE_KEY)) {
+        pinLocale(locale);
+        window.location.reload();
+        return;
+      }
+      if (locale) pinLocale(locale);
+    } catch {
+      /* keep pinned default */
+    }
     try {
       const ready = await bootstrapStudioAuth();
-      if (ready && path !== "/hub" && path !== "/chat") {
-        window.location.replace("/hub");
+      if (ready && path !== HOME && path !== "/studio" && path !== "/export") {
+        window.location.replace(HOME);
       }
     } catch {
       /* keep Studio's own login if bootstrap fails */

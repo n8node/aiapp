@@ -28,7 +28,7 @@ export function AdminUnslothPage() {
       </div>
       <iframe
         title="Unsloth Studio"
-        src="/hub"
+        src="/chat"
         className="min-h-0 flex-1 rounded-xl border border-slate-200 bg-white"
       />
     </div>

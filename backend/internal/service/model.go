@@ -155,7 +155,7 @@ func (s *ModelService) Action(ctx context.Context, actorID, id, action string) (
 }
 
 func (s *ModelService) StudioStatus(ctx context.Context) model.StudioStatus {
-	st := model.StudioStatus{Path: "/hub", Reachable: false}
+	st := model.StudioStatus{Path: "/chat", Reachable: false}
 	if s.studio == "" {
 		return st
 	}
