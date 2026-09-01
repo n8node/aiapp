@@ -29,8 +29,12 @@
 
   function boot() {
     const path = window.location.pathname;
-    if (path === "/login" || path === "/onboarding" || path.startsWith("/login/") || path.startsWith("/onboarding/") || path.startsWith("/change-password")) {
-      window.location.replace("/app/training");
+    if (path === "/login" || path === "/onboarding" || path.startsWith("/login/") || path.startsWith("/onboarding/")) {
+      window.location.replace("/hub");
+      return;
+    }
+    if (path === "/change-password" || path.startsWith("/change-password/")) {
+      window.location.replace("/app/settings");
       return;
     }
     applyLocale(DEFAULT_LOCALE);

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
@@ -180,13 +181,18 @@ export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string 
       )}
 
       {studio ? (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold">Unsloth Studio</h2>
-          <p className="mt-1 text-sm text-muted">
-            Полный интерфейс Studio в контуре портала. Обучение запускайте только по одобренной заявке.
-          </p>
-          <iframe title="Unsloth Studio" src="/app/studio/" className="mt-3 min-h-[70vh] w-full rounded-xl border border-border bg-white" />
-        </div>
+        <p className="mt-6 text-sm text-muted">
+          Полный интерфейс Studio открывается отдельно, без оболочки кабинета.{" "}
+          {user.is_platform_admin ? (
+            <Link href="/admin/unsloth" className="text-accent hover:underline">
+              Открыть Studio
+            </Link>
+          ) : (
+            <a href="/hub" className="text-accent hover:underline">
+              Открыть Studio
+            </a>
+          )}
+        </p>
       ) : (
         <p className="mt-6 text-sm text-muted">
           Доступ к полному интерфейсу Studio выдаёт администратор платформы в карточке пользователя.
