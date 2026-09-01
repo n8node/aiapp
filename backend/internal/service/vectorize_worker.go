@@ -131,6 +131,9 @@ func (w *VectorizeWorker) indexFile(ctx context.Context, job *model.VectorizeJob
 		return nil
 	}
 	chunks := chunkText(text, defaultChunkSize, defaultChunkOverlap)
+	if kb, err := w.kb.Get(ctx, job.WorkspaceID, job.KnowledgeBaseID); err == nil {
+		chunks = chunkText(text, kb.ChunkSize, kb.ChunkOverlap)
+	}
 	if err := w.kb.DeleteChunksForFile(ctx, job.KnowledgeBaseID, item.FileID); err != nil {
 		return err
 	}

@@ -101,6 +101,8 @@ func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 				kind = "ingest"
 			case strings.HasSuffix(path, "/search") && strings.Contains(path, "/knowledge-bases/"):
 				kind = "search"
+			case path == "/api/v1/chats" || strings.HasSuffix(path, "/messages") && strings.Contains(path, "/chats/") || strings.HasSuffix(path, "/media") && strings.Contains(path, "/chats/"):
+				kind = "chat"
 			default:
 				next.ServeHTTP(w, r)
 				return
@@ -120,6 +122,9 @@ func limitDiskUpload(upload *rateLimiter) func(http.Handler) http.Handler {
 				}
 				if kind == "search" {
 					msg = "Слишком много поисковых запросов, подождите"
+				}
+				if kind == "chat" {
+					msg = "Слишком много запросов к чату, подождите"
 				}
 				writeError(w, http.StatusTooManyRequests, "rate_limited", msg)
 				return

@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent } from "react";
-import { useRouter } from "next/navigation";
 import {
   Check,
   Clock,
   Copy,
   Download,
-  FileText,
   Folder,
   FolderInput,
   FolderPlus,
@@ -40,7 +38,6 @@ import {
   filterFolders,
   filtersActive,
   isArchiveFile,
-  isIngestibleFile,
   kindLabel,
   loadVisibleTabs,
   saveVisibleTabs,
@@ -76,7 +73,6 @@ import {
   restoreTrash,
   uploadFile,
 } from "@/lib/files-api";
-import { createDocumentFromFile } from "@/lib/documents-api";
 
 const SECTIONS: { id: FilesSection; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "my-files", label: "Файлы", icon: Folder },
@@ -136,7 +132,6 @@ export function FileManager({
 }: {
   workspace: { id: string; name: string } | null;
 }) {
-  const router = useRouter();
   const [section, setSection] = useState<FilesSection>("my-files");
   const [folderId, setFolderId] = useState<string | null>(null);
   const [folderTrail, setFolderTrail] = useState<FolderBreadcrumb[]>([]);
@@ -171,7 +166,6 @@ export function FileManager({
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [extractingId, setExtractingId] = useState<string | null>(null);
-  const [ingestingId, setIngestingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(new Map<string, AbortController>());
   const dragDepth = useRef(0);
@@ -527,19 +521,6 @@ export function FileManager({
       setError(e instanceof Error ? e.message : "Не удалось распаковать архив");
     } finally {
       setExtractingId(null);
-    }
-  };
-
-  const handleIngest = async (id: string) => {
-    setIngestingId(id);
-    setError(null);
-    try {
-      const res = await createDocumentFromFile(id);
-      router.push(`/documents/${res.document.id}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось отправить в документы");
-    } finally {
-      setIngestingId(null);
     }
   };
 
@@ -1053,8 +1034,6 @@ export function FileManager({
           onCopy={() => void copyFile(previewFile.id, folderId).then(refresh)}
           onExtract={() => void handleExtract(previewFile.id)}
           extracting={extractingId === previewFile.id}
-          onIngest={() => void handleIngest(previewFile.id)}
-          ingesting={ingestingId === previewFile.id}
           onDelete={() => setConfirm({ mode: "delete-file", id: previewFile.id })}
         />
       ) : null}
@@ -1101,20 +1080,6 @@ export function FileManager({
                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50"
                   >
                     <FolderArchive className="h-4 w-4" /> {extractingId ? "Распаковка…" : "Распаковать"}
-                  </button>
-                ) : null}
-                {selected.size === 1 &&
-                [...selected].some((id) => selectedKinds.get(id) === "file" && files.some((f) => f.id === id && isIngestibleFile(f))) ? (
-                  <button
-                    type="button"
-                    disabled={Boolean(ingestingId)}
-                    onClick={() => {
-                      const id = [...selected].find((item) => selectedKinds.get(item) === "file");
-                      if (id) void handleIngest(id);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50"
-                  >
-                    <FileText className="h-4 w-4" /> {ingestingId ? "Отправка…" : "В документы"}
                   </button>
                 ) : null}
                 <button

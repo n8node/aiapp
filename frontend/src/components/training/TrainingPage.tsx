@@ -29,10 +29,6 @@ const statusLabel: Record<string, string> = {
   cancelled: "Отменена",
 };
 
-function canOpenStudio(user: User) {
-  return user.is_platform_admin || Boolean(user.studio_access);
-}
-
 export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string }) {
   const [items, setItems] = useState<TrainingRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -41,15 +37,15 @@ export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string 
   const [purpose, setPurpose] = useState("behavior");
   const [datasetNote, setDatasetNote] = useState("");
   const [baseModel, setBaseModel] = useState("");
-  const studio = canOpenStudio(user);
 
   useEffect(() => {
+    if (!user.is_platform_admin) return;
     try {
       window.localStorage.setItem("unsloth_locale", uiLocale || "ru");
     } catch {
       /* ignore */
     }
-  }, [uiLocale]);
+  }, [uiLocale, user.is_platform_admin]);
 
   async function refresh() {
     const res = await fetchTrainingRequests();
@@ -97,7 +93,7 @@ export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string 
     <div>
       <PageHeader
         title="Обучение"
-        description="Заявки на fine-tune идут через RigIntel: снимок датасета, проверка, одобрение. Studio исполняет обучение, но не выдаёт права и не выкатывает модели в шлюз."
+        description="Заявки на fine-tune идут через RigIntel: снимок датасета, проверка, одобрение. Обучение исполняется в инженерном контуре, модели в чат попадают только после выкладки администратором."
       />
       {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
 
@@ -180,22 +176,16 @@ export function TrainingPage({ user, uiLocale }: { user: User; uiLocale: string 
         </div>
       )}
 
-      {studio ? (
+      {user.is_platform_admin ? (
         <p className="mt-6 text-sm text-muted">
-          Полный интерфейс Studio открывается отдельно, без оболочки кабинета.{" "}
-          {user.is_platform_admin ? (
-            <Link href="/admin/unsloth" className="text-accent hover:underline">
-              Открыть Studio
-            </Link>
-          ) : (
-            <a href="/chat" className="text-accent hover:underline">
-              Открыть Studio
-            </a>
-          )}
+          Полный контур обучения для инженеров открывается отдельно, без оболочки кабинета.{" "}
+          <Link href="/admin/unsloth" className="text-accent hover:underline">
+            Открыть контур обучения
+          </Link>
         </p>
       ) : (
         <p className="mt-6 text-sm text-muted">
-          Доступ к полному интерфейсу Studio выдаёт администратор платформы в карточке пользователя.
+          Заявки проверяет администратор. Одобренные модели появляются в разделе «Чаты».
         </p>
       )}
     </div>

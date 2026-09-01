@@ -51,6 +51,8 @@ export function fetchModelRuntime() {
 export const PURPOSE_LABEL: Record<string, string> = {
   embeddings: "Эмбеддинги",
   chat: "Чат",
+  image: "Изображения",
+  video: "Видео",
   ocr: "OCR",
   rerank: "Реранк",
 };

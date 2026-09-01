@@ -69,6 +69,7 @@ services:
     environment:
       GATEWAY_TOKEN: ${JWT_SECRET}
       VLLM_URL: ${VLLM_URL:-}
+      CHAT_URL: ${CHAT_URL:-http://unsloth-studio:8000}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/live', timeout=2)"]
       interval: 10s

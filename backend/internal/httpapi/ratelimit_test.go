@@ -121,4 +121,21 @@ func TestLimitKnowledgeVectorizeAndSearch(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("second search got %d", rec.Code)
 	}
+
+	chatLim := newRateLimiter(time.Minute, 1)
+	ch := limitDiskUpload(chatLim)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	creq := httptest.NewRequest(http.MethodPost, "/api/v1/chats/th-1/messages", nil)
+	creq = creq.WithContext(authn.WithUser(creq.Context(), "user-a", "sess"))
+	rec = httptest.NewRecorder()
+	ch.ServeHTTP(rec, creq)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("first chat got %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	ch.ServeHTTP(rec, creq)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second chat got %d", rec.Code)
+	}
 }

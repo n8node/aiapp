@@ -126,6 +126,8 @@ export function AdminModelsPage() {
           >
             <option value="embeddings">Эмбеддинги</option>
             <option value="chat">Чат</option>
+            <option value="image">Изображения</option>
+            <option value="video">Видео</option>
             <option value="ocr">OCR</option>
             <option value="rerank">Реранк</option>
           </select>

@@ -70,6 +70,8 @@ func main() {
 	vectorizeWorker := service.NewVectorizeWorker(kbRepo, diskRepo, objectStore, extractor, gw, logger)
 	trainRepo := repository.NewTrainingRepository(handle)
 	trainSvc := service.NewTrainingService(trainRepo, authSvc, audit)
+	chatRepo := repository.NewChatRepository(handle)
+	chatSvc := service.NewChatService(chatRepo, kbRepo, mlRepo, authSvc, audit, gw)
 	studioAuth := service.NewStudioAuthService(cfg.StudioURL, cfg.StudioPassword, authSvc)
 
 	if cfg.SuperadminEmail != "" && cfg.SuperadminPassword != "" {
@@ -85,7 +87,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Training: trainSvc, StudioAuth: studioAuth, Tokens: tokens}),
+		Handler:           httpapi.NewRouter(httpapi.Dependencies{Config: cfg, Ping: pool, Auth: authSvc, Bitrix: bitrixSvc, Workspaces: workspaceSvc, Storage: storageSvc, Disk: diskSvc, Documents: docSvc, Models: modelSvc, Knowledge: kbSvc, Training: trainSvc, Chat: chatSvc, StudioAuth: studioAuth, Tokens: tokens}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Minute,

@@ -1,5 +1,5 @@
-import { KnowledgeListPage } from "@/components/knowledge/KnowledgeListPage";
+import { redirect } from "next/navigation";
 
-export default function KnowledgeRoute() {
-  return <KnowledgeListPage />;
+export default function Page() {
+  redirect("/rag");
 }

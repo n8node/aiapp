@@ -7,6 +7,8 @@ const (
 	ModelPurposeChat       = "chat"
 	ModelPurposeOCR        = "ocr"
 	ModelPurposeRerank     = "rerank"
+	ModelPurposeImage      = "image"
+	ModelPurposeVideo      = "video"
 
 	ModelSourceHuggingFace = "huggingface"
 	ModelSourceUpload      = "upload"
@@ -84,17 +86,21 @@ type GatewayStatus struct {
 }
 
 type KnowledgeBase struct {
-	ID               string              `json:"id"`
-	WorkspaceID      string              `json:"workspace_id"`
-	Name             string              `json:"name"`
-	ChunkSize        int                 `json:"chunk_size"`
-	ChunkOverlap     int                 `json:"chunk_overlap"`
-	EmbeddingModelID *string             `json:"embedding_model_id,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
-	FileCount        int                 `json:"file_count"`
-	IndexedCount     int                 `json:"indexed_count"`
-	Files            []KnowledgeBaseFile `json:"files,omitempty"`
+	ID                   string              `json:"id"`
+	WorkspaceID          string              `json:"workspace_id"`
+	Name                 string              `json:"name"`
+	ChunkSize            int                 `json:"chunk_size"`
+	ChunkOverlap         int                 `json:"chunk_overlap"`
+	FolderID             *string             `json:"folder_id,omitempty"`
+	SimilarityThreshold  float64             `json:"similarity_threshold"`
+	TopK                 int                 `json:"top_k"`
+	EmbeddingModelID     *string             `json:"embedding_model_id,omitempty"`
+	CreatedAt            time.Time           `json:"created_at"`
+	UpdatedAt            time.Time           `json:"updated_at"`
+	FileCount            int                 `json:"file_count"`
+	IndexedCount         int                 `json:"indexed_count"`
+	Files                []KnowledgeBaseFile `json:"files,omitempty"`
+	LatestJob            *VectorizeJob       `json:"latest_job,omitempty"`
 }
 
 type KnowledgeBaseFile struct {
@@ -113,8 +119,15 @@ type KnowledgeBaseCreateRequest struct {
 }
 
 type KnowledgeBasePatchRequest struct {
-	Name    *string  `json:"name"`
-	FileIDs []string `json:"file_ids"`
+	Name                *string  `json:"name"`
+	FileIDs             []string `json:"file_ids"`
+	RemoveFileIDs       []string `json:"remove_file_ids"`
+	FolderID            *string  `json:"folder_id"`
+	ChunkSize           *int     `json:"chunk_size"`
+	ChunkOverlap        *int     `json:"chunk_overlap"`
+	SimilarityThreshold *float64 `json:"similarity_threshold"`
+	TopK                *int     `json:"top_k"`
+	ClearVectors        bool     `json:"clear_vectors"`
 }
 
 type VectorizeResult struct {
@@ -137,16 +150,16 @@ type KnowledgeHit struct {
 }
 
 type VectorizeJob struct {
-	ID              string
-	WorkspaceID     string
-	KnowledgeBaseID string
-	CreatedByUserID *string
-	Status          string
-	Attempts        int
-	MaxAttempts     int
-	LeaseUntil      *time.Time
-	LeaseOwner      *string
-	LastError       *string
-	Processed       int
-	Total           int
+	ID              string     `json:"id"`
+	WorkspaceID     string     `json:"workspace_id,omitempty"`
+	KnowledgeBaseID string     `json:"knowledge_base_id"`
+	CreatedByUserID *string    `json:"-"`
+	Status          string     `json:"status"`
+	Attempts        int        `json:"-"`
+	MaxAttempts     int        `json:"-"`
+	LeaseUntil      *time.Time `json:"-"`
+	LeaseOwner      *string    `json:"-"`
+	LastError       *string    `json:"last_error,omitempty"`
+	Processed       int        `json:"processed"`
+	Total           int        `json:"total"`
 }

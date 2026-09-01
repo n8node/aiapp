@@ -119,6 +119,12 @@ func mapAuthError(err error) (int, string, string) {
 		return http.StatusBadGateway, "extract_unavailable", "Сервис извлечения текста недоступен"
 	case errors.Is(err, service.ErrGatewayUnavailable):
 		return http.StatusBadGateway, "gateway_unavailable", "Шлюз моделей недоступен"
+	case errors.Is(err, service.ErrChatNotFound):
+		return http.StatusNotFound, "chat_not_found", "Чат не найден"
+	case errors.Is(err, service.ErrNoChatModel):
+		return http.StatusBadRequest, "no_chat_model", "Нет развёрнутой модели для этого действия. Обратитесь к администратору."
+	case errors.Is(err, service.ErrMediaUnavailable):
+		return http.StatusNotImplemented, "media_unavailable", "Генерация изображения или видео сейчас недоступна"
 	case errors.Is(err, service.ErrObjectTooLarge):
 		return http.StatusRequestEntityTooLarge, "file_too_large", "Файл слишком большой"
 	case errors.Is(err, service.ErrModelNotFound):

@@ -19,6 +19,9 @@ var (
 	ErrGatewayUnavailable = errors.New("gateway unavailable")
 	ErrKnowledgeNotFound  = errors.New("knowledge base not found")
 	ErrVectorizeBusy      = errors.New("vectorize busy")
+	ErrChatNotFound       = errors.New("chat not found")
+	ErrNoChatModel        = errors.New("no chat model")
+	ErrMediaUnavailable   = errors.New("media unavailable")
 )
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}$`)
@@ -43,7 +46,16 @@ func NewModelService(repo *repository.MLModelRepository, audit *repository.Audit
 
 func validPurpose(p string) bool {
 	switch p {
-	case model.ModelPurposeEmbeddings, model.ModelPurposeChat, model.ModelPurposeOCR, model.ModelPurposeRerank:
+	case model.ModelPurposeEmbeddings, model.ModelPurposeChat, model.ModelPurposeOCR, model.ModelPurposeRerank, model.ModelPurposeImage, model.ModelPurposeVideo:
+		return true
+	default:
+		return false
+	}
+}
+
+func exclusiveDeployPurpose(p string) bool {
+	switch p {
+	case model.ModelPurposeEmbeddings, model.ModelPurposeOCR, model.ModelPurposeRerank:
 		return true
 	default:
 		return false
@@ -132,10 +144,15 @@ func (s *ModelService) Action(ctx context.Context, actorID, id, action string) (
 		if m.Status != model.ModelStatusApproved && m.Status != model.ModelStatusDeployed {
 			return nil, ErrModelInvalidState
 		}
-		if err := s.repo.UndeployPurpose(ctx, m.Purpose, id); err != nil {
-			return nil, err
+		if exclusiveDeployPurpose(m.Purpose) {
+			if err := s.repo.UndeployPurpose(ctx, m.Purpose, id); err != nil {
+				return nil, err
+			}
 		}
 		alias := m.Purpose
+		if m.Purpose == model.ModelPurposeChat || m.Purpose == model.ModelPurposeImage || m.Purpose == model.ModelPurposeVideo {
+			alias = m.Slug
+		}
 		if err := s.repo.SetDeployed(ctx, id, alias); err != nil {
 			return nil, err
 		}
@@ -170,6 +187,25 @@ func (s *ModelService) StudioStatus(ctx context.Context) model.StudioStatus {
 	defer resp.Body.Close()
 	st.Reachable = resp.StatusCode > 0 && resp.StatusCode < 500
 	return st
+}
+
+func (s *ModelService) Catalog(ctx context.Context) ([]model.CatalogModel, error) {
+	items, err := s.repo.ListDeployed(ctx, []string{
+		model.ModelPurposeChat, model.ModelPurposeImage, model.ModelPurposeVideo,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.CatalogModel, 0, len(items))
+	for _, m := range items {
+		out = append(out, model.CatalogModel{
+			ID:          m.ID,
+			Slug:        m.Slug,
+			DisplayName: m.DisplayName,
+			Purpose:     m.Purpose,
+		})
+	}
+	return out, nil
 }
 
 func (s *ModelService) GatewayStatus(ctx context.Context) model.GatewayStatus {

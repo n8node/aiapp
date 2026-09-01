@@ -1,5 +1,5 @@
-import { DocumentsPage } from "@/components/documents/DocumentsPage";
+import { redirect } from "next/navigation";
 
-export default function DocumentsRoute() {
-  return <DocumentsPage />;
+export default function Page() {
+  redirect("/rag");
 }

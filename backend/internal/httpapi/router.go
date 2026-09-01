@@ -24,6 +24,7 @@ type Dependencies struct {
 	Models     *service.ModelService
 	Knowledge  *service.KnowledgeService
 	Training   *service.TrainingService
+	Chat       *service.ChatService
 	StudioAuth *service.StudioAuthService
 	Tokens     *authn.JWT
 }
@@ -40,6 +41,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	modelH := NewModelHandler(deps.Models)
 	kbH := NewKnowledgeHandler(deps.Knowledge)
 	trainH := NewTrainingHandler(deps.Training)
+	chatH := NewChatHandler(deps.Chat)
 	studioH := NewStudioHandler(deps.StudioAuth)
 
 	r := chi.NewRouter()
@@ -105,6 +107,14 @@ func NewRouter(deps Dependencies) http.Handler {
 				r.Delete("/knowledge-bases/{kbID}", kbH.Delete)
 				r.Post("/knowledge-bases/{kbID}/vectorize", kbH.Vectorize)
 				r.Post("/knowledge-bases/{kbID}/search", kbH.Search)
+				r.Get("/models", modelH.Catalog)
+				r.Get("/chats", chatH.List)
+				r.Post("/chats", chatH.Create)
+				r.Get("/chats/{threadID}", chatH.Get)
+				r.Patch("/chats/{threadID}", chatH.Patch)
+				r.Delete("/chats/{threadID}", chatH.Delete)
+				r.Post("/chats/{threadID}/messages", chatH.Send)
+				r.Post("/chats/{threadID}/media", chatH.Media)
 				r.Get("/training-requests", trainH.List)
 				r.Post("/training-requests", trainH.Create)
 				r.Get("/training-requests/{requestID}", trainH.Get)

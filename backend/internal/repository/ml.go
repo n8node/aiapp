@@ -55,6 +55,29 @@ func (r *MLModelRepository) List(ctx context.Context) ([]model.MLModel, error) {
 	return out, rows.Err()
 }
 
+func (r *MLModelRepository) ListDeployed(ctx context.Context, purposes []string) ([]model.MLModel, error) {
+	if len(purposes) == 0 {
+		return []model.MLModel{}, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT `+mlModelCols+` FROM ml_models WHERE status = 'deployed' AND purpose = ANY($1) ORDER BY display_name`, purposes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.MLModel
+	for rows.Next() {
+		m, err := scanMLModel(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *m)
+	}
+	if out == nil {
+		out = []model.MLModel{}
+	}
+	return out, rows.Err()
+}
+
 func (r *MLModelRepository) Get(ctx context.Context, id string) (*model.MLModel, error) {
 	return scanMLModel(r.pool.QueryRow(ctx, `SELECT `+mlModelCols+` FROM ml_models WHERE id = $1`, id))
 }

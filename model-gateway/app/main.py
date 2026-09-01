@@ -11,8 +11,15 @@ from pydantic import BaseModel, Field
 from app.auth import require_gateway_token
 from app.embedder import get_embedder, prefix_text
 
+from fastapi.responses import StreamingResponse
+
 app = FastAPI(title="rigintel-model-gateway", docs_url=None, redoc_url=None, openapi_url=None)
 VLLM_URL = (os.environ.get("VLLM_URL") or "").rstrip("/")
+CHAT_URL = (os.environ.get("CHAT_URL") or "").rstrip("/")
+
+
+def chat_upstream() -> str:
+    return VLLM_URL or CHAT_URL
 
 
 @app.on_event("startup")
@@ -73,20 +80,63 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
+class MediaRequest(BaseModel):
+    model: str = ""
+    prompt: str
+    n: int = 1
+
+
+def _proxy_json(path: str, payload: dict[str, Any]) -> Any:
+    upstream = chat_upstream()
+    if not upstream:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="chat_not_configured")
+    try:
+        with httpx.Client(timeout=180.0) as client:
+            resp = client.post(upstream + path, json=payload, headers={"Content-Type": "application/json"})
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="chat_unavailable") from None
+    if resp.status_code in (404, 405, 501):
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="media_unavailable")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="chat_unavailable")
+    try:
+        return resp.json()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="chat_unavailable") from None
+
+
 @app.post("/v1/chat/completions")
 def chat(body: ChatRequest, _: None = Depends(require_gateway_token)) -> Any:
-    if not VLLM_URL:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="chat_not_configured",
-        )
+    upstream = chat_upstream()
+    if not upstream:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="chat_not_configured")
+    payload = body.model_dump()
     if body.stream:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="stream_unsupported")
+
+        def gen():
+            try:
+                with httpx.Client(timeout=httpx.Timeout(180.0)) as client:
+                    with client.stream(
+                        "POST",
+                        upstream + "/v1/chat/completions",
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    ) as resp:
+                        if resp.status_code >= 400:
+                            yield b'data: {"error":"chat_unavailable"}\n\n'
+                            return
+                        for chunk in resp.iter_bytes():
+                            if chunk:
+                                yield chunk
+            except Exception:
+                yield b'data: {"error":"chat_unavailable"}\n\n'
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
     try:
-        with httpx.Client(timeout=60.0) as client:
+        with httpx.Client(timeout=180.0) as client:
             resp = client.post(
-                VLLM_URL + "/v1/chat/completions",
-                json=body.model_dump(),
+                upstream + "/v1/chat/completions",
+                json=payload,
                 headers={"Content-Type": "application/json"},
             )
     except Exception:
@@ -94,3 +144,13 @@ def chat(body: ChatRequest, _: None = Depends(require_gateway_token)) -> Any:
     if resp.status_code >= 400:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="chat_unavailable")
     return resp.json()
+
+
+@app.post("/v1/images/generations")
+def images(body: MediaRequest, _: None = Depends(require_gateway_token)) -> Any:
+    return _proxy_json("/v1/images/generations", body.model_dump())
+
+
+@app.post("/v1/videos/generations")
+def videos(body: MediaRequest, _: None = Depends(require_gateway_token)) -> Any:
+    return _proxy_json("/v1/videos/generations", body.model_dump())

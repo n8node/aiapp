@@ -73,13 +73,21 @@ func (s *KnowledgeService) Create(ctx context.Context, userID, sessionID string,
 	if m, err := s.models.DeployedByPurpose(ctx, model.ModelPurposeEmbeddings); err == nil {
 		embedID = &m.ID
 	}
+	var folderID *string
+	if req.FolderID != nil && strings.TrimSpace(*req.FolderID) != "" {
+		fid := strings.TrimSpace(*req.FolderID)
+		folderID = &fid
+	}
 	uid := userID
 	k, err := s.kb.Create(ctx, &model.KnowledgeBase{
-		WorkspaceID:      ws.ID,
-		Name:             name,
-		ChunkSize:        defaultChunkSize,
-		ChunkOverlap:     defaultChunkOverlap,
-		EmbeddingModelID: embedID,
+		WorkspaceID:         ws.ID,
+		Name:                name,
+		ChunkSize:           defaultChunkSize,
+		ChunkOverlap:        defaultChunkOverlap,
+		FolderID:            folderID,
+		SimilarityThreshold: 0.3,
+		TopK:                8,
+		EmbeddingModelID:    embedID,
 	}, &uid)
 	if err != nil {
 		return nil, err
@@ -124,7 +132,14 @@ func (s *KnowledgeService) Get(ctx context.Context, userID, sessionID, id string
 	if err != nil {
 		return nil, err
 	}
-	return s.withFiles(ctx, k)
+	out, err := s.withFiles(ctx, k)
+	if err != nil {
+		return nil, err
+	}
+	if job, jerr := s.kb.LatestJob(ctx, k.ID); jerr == nil {
+		out.LatestJob = job
+	}
+	return out, nil
 }
 
 func (s *KnowledgeService) Delete(ctx context.Context, userID, sessionID, id string) error {
@@ -146,7 +161,8 @@ func (s *KnowledgeService) Patch(ctx context.Context, userID, sessionID, id stri
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.kb.Get(ctx, ws.ID, id); errors.Is(err, repository.ErrNotFound) {
+	k, err := s.kb.Get(ctx, ws.ID, id)
+	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrKnowledgeNotFound
 	} else if err != nil {
 		return nil, err
@@ -160,12 +176,65 @@ func (s *KnowledgeService) Patch(ctx context.Context, userID, sessionID, id stri
 			return nil, err
 		}
 	}
+	if req.ClearVectors {
+		if err := s.kb.ClearVectors(ctx, id); err != nil {
+			return nil, err
+		}
+	}
+	settingsTouched := req.ChunkSize != nil || req.ChunkOverlap != nil || req.TopK != nil || req.SimilarityThreshold != nil || req.FolderID != nil
+	if settingsTouched {
+		chunkSize := k.ChunkSize
+		overlap := k.ChunkOverlap
+		topK := k.TopK
+		th := k.SimilarityThreshold
+		folderID := k.FolderID
+		if req.ChunkSize != nil {
+			if *req.ChunkSize < 64 || *req.ChunkSize > 4000 {
+				return nil, ErrInvalidInput
+			}
+			chunkSize = *req.ChunkSize
+		}
+		if req.ChunkOverlap != nil {
+			if *req.ChunkOverlap < 0 || *req.ChunkOverlap >= chunkSize {
+				return nil, ErrInvalidInput
+			}
+			overlap = *req.ChunkOverlap
+		}
+		if req.TopK != nil {
+			if *req.TopK < 1 || *req.TopK > 50 {
+				return nil, ErrInvalidInput
+			}
+			topK = *req.TopK
+		}
+		if req.SimilarityThreshold != nil {
+			if *req.SimilarityThreshold < 0 || *req.SimilarityThreshold > 1 {
+				return nil, ErrInvalidInput
+			}
+			th = *req.SimilarityThreshold
+		}
+		if req.FolderID != nil {
+			if strings.TrimSpace(*req.FolderID) == "" {
+				folderID = nil
+			} else {
+				fid := strings.TrimSpace(*req.FolderID)
+				folderID = &fid
+			}
+		}
+		if err := s.kb.UpdateSettings(ctx, ws.ID, id, chunkSize, overlap, topK, th, folderID); err != nil {
+			return nil, err
+		}
+	}
 	if req.FileIDs != nil {
 		if err := s.attach(ctx, userID, sessionID, ws.ID, id, uniqueIDs(req.FileIDs)); err != nil {
 			return nil, err
 		}
 	}
-	k, err := s.kb.Get(ctx, ws.ID, id)
+	if req.RemoveFileIDs != nil {
+		if err := s.kb.DetachFiles(ctx, id, uniqueIDs(req.RemoveFileIDs)); err != nil {
+			return nil, err
+		}
+	}
+	k, err = s.kb.Get(ctx, ws.ID, id)
 	if err != nil {
 		return nil, err
 	}

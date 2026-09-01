@@ -20,12 +20,12 @@ func NewKnowledgeRepository(pool *pgxpool.Pool) *KnowledgeRepository {
 	return &KnowledgeRepository{pool: pool}
 }
 
-const kbCols = `id, workspace_id, name, chunk_size, chunk_overlap, embedding_model_id, created_by_user_id, created_at, updated_at`
+const kbCols = `id, workspace_id, name, chunk_size, chunk_overlap, folder_id, similarity_threshold, top_k, embedding_model_id, created_by_user_id, created_at, updated_at`
 
 func scanKB(row pgx.Row) (*model.KnowledgeBase, error) {
 	var k model.KnowledgeBase
 	var createdBy *string
-	err := row.Scan(&k.ID, &k.WorkspaceID, &k.Name, &k.ChunkSize, &k.ChunkOverlap, &k.EmbeddingModelID, &createdBy, &k.CreatedAt, &k.UpdatedAt)
+	err := row.Scan(&k.ID, &k.WorkspaceID, &k.Name, &k.ChunkSize, &k.ChunkOverlap, &k.FolderID, &k.SimilarityThreshold, &k.TopK, &k.EmbeddingModelID, &createdBy, &k.CreatedAt, &k.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -34,9 +34,9 @@ func scanKB(row pgx.Row) (*model.KnowledgeBase, error) {
 
 func (r *KnowledgeRepository) Create(ctx context.Context, k *model.KnowledgeBase, createdBy *string) (*model.KnowledgeBase, error) {
 	return scanKB(r.pool.QueryRow(ctx, `
-		INSERT INTO knowledge_bases (workspace_id, name, chunk_size, chunk_overlap, embedding_model_id, created_by_user_id)
-		VALUES ($1,$2,$3,$4,$5,$6)
-		RETURNING `+kbCols, k.WorkspaceID, k.Name, k.ChunkSize, k.ChunkOverlap, k.EmbeddingModelID, createdBy))
+		INSERT INTO knowledge_bases (workspace_id, name, chunk_size, chunk_overlap, folder_id, similarity_threshold, top_k, embedding_model_id, created_by_user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		RETURNING `+kbCols, k.WorkspaceID, k.Name, k.ChunkSize, k.ChunkOverlap, k.FolderID, k.SimilarityThreshold, k.TopK, k.EmbeddingModelID, createdBy))
 }
 
 func (r *KnowledgeRepository) Get(ctx context.Context, workspaceID, id string) (*model.KnowledgeBase, error) {
@@ -45,7 +45,7 @@ func (r *KnowledgeRepository) Get(ctx context.Context, workspaceID, id string) (
 
 func (r *KnowledgeRepository) List(ctx context.Context, workspaceID string) ([]model.KnowledgeBase, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT k.id, k.workspace_id, k.name, k.chunk_size, k.chunk_overlap, k.embedding_model_id, k.created_by_user_id, k.created_at, k.updated_at,
+		SELECT k.id, k.workspace_id, k.name, k.chunk_size, k.chunk_overlap, k.folder_id, k.similarity_threshold, k.top_k, k.embedding_model_id, k.created_by_user_id, k.created_at, k.updated_at,
 			COUNT(f.file_id)::int,
 			COUNT(f.file_id) FILTER (WHERE f.status = 'indexed')::int
 		FROM knowledge_bases k
@@ -61,7 +61,7 @@ func (r *KnowledgeRepository) List(ctx context.Context, workspaceID string) ([]m
 	for rows.Next() {
 		var k model.KnowledgeBase
 		var createdBy *string
-		if err := rows.Scan(&k.ID, &k.WorkspaceID, &k.Name, &k.ChunkSize, &k.ChunkOverlap, &k.EmbeddingModelID, &createdBy, &k.CreatedAt, &k.UpdatedAt, &k.FileCount, &k.IndexedCount); err != nil {
+		if err := rows.Scan(&k.ID, &k.WorkspaceID, &k.Name, &k.ChunkSize, &k.ChunkOverlap, &k.FolderID, &k.SimilarityThreshold, &k.TopK, &k.EmbeddingModelID, &createdBy, &k.CreatedAt, &k.UpdatedAt, &k.FileCount, &k.IndexedCount); err != nil {
 			return nil, err
 		}
 		out = append(out, k)
@@ -94,6 +94,73 @@ func (r *KnowledgeRepository) Rename(ctx context.Context, workspaceID, id, name 
 	return nil
 }
 
+func (r *KnowledgeRepository) UpdateSettings(ctx context.Context, workspaceID, id string, chunkSize, chunkOverlap, topK int, threshold float64, folderID *string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE knowledge_bases SET chunk_size = $3, chunk_overlap = $4, top_k = $5, similarity_threshold = $6, folder_id = $7, updated_at = NOW()
+		WHERE id = $1 AND workspace_id = $2`, id, workspaceID, chunkSize, chunkOverlap, topK, threshold, folderID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *KnowledgeRepository) ClearVectors(ctx context.Context, kbID string) error {
+	if _, err := r.pool.Exec(ctx, `DELETE FROM knowledge_chunks WHERE knowledge_base_id = $1`, kbID); err != nil {
+		return err
+	}
+	_, err := r.pool.Exec(ctx, `
+		UPDATE knowledge_base_files SET status = 'pending', chunk_count = 0, content_hash = '', error_code = NULL, updated_at = NOW()
+		WHERE knowledge_base_id = $1`, kbID)
+	return err
+}
+
+func (r *KnowledgeRepository) LatestJob(ctx context.Context, kbID string) (*model.VectorizeJob, error) {
+	return scanVecJob(r.pool.QueryRow(ctx, `
+		SELECT id, workspace_id, knowledge_base_id, created_by_user_id, status, attempts, max_attempts, lease_until, lease_owner, last_error, processed, total
+		FROM vectorize_jobs
+		WHERE knowledge_base_id = $1
+		ORDER BY created_at DESC LIMIT 1`, kbID))
+}
+
+func (r *KnowledgeRepository) SearchVectorMany(ctx context.Context, workspaceID string, kbIDs []string, embedding []float64, limit int, threshold float64) ([]model.KnowledgeHit, error) {
+	if len(kbIDs) == 0 {
+		return []model.KnowledgeHit{}, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	vec := formatVector(embedding)
+	rows, err := r.pool.Query(ctx, `
+		SELECT c.file_id, COALESCE(wf.name, ''), c.chunk_index, c.content,
+			1 - (c.embedding <=> $3::vector) AS similarity
+		FROM knowledge_chunks c
+		LEFT JOIN workspace_files wf ON wf.id = c.file_id
+		WHERE c.workspace_id = $1 AND c.knowledge_base_id::text = ANY($2)
+			AND c.embedding IS NOT NULL
+			AND 1 - (c.embedding <=> $3::vector) >= $4
+		ORDER BY c.embedding <=> $3::vector
+		LIMIT $5`, workspaceID, kbIDs, vec, threshold, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.KnowledgeHit
+	for rows.Next() {
+		var h model.KnowledgeHit
+		if err := rows.Scan(&h.FileID, &h.FileName, &h.ChunkIndex, &h.Content, &h.Similarity); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	if out == nil {
+		out = []model.KnowledgeHit{}
+	}
+	return out, rows.Err()
+}
+
 func (r *KnowledgeRepository) AttachFiles(ctx context.Context, kbID string, fileIDs []string) error {
 	for _, id := range fileIDs {
 		_, err := r.pool.Exec(ctx, `
@@ -101,6 +168,18 @@ func (r *KnowledgeRepository) AttachFiles(ctx context.Context, kbID string, file
 			VALUES ($1,$2,'pending')
 			ON CONFLICT (knowledge_base_id, file_id) DO NOTHING`, kbID, id)
 		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *KnowledgeRepository) DetachFiles(ctx context.Context, kbID string, fileIDs []string) error {
+	for _, id := range fileIDs {
+		if err := r.DeleteChunksForFile(ctx, kbID, id); err != nil {
+			return err
+		}
+		if _, err := r.pool.Exec(ctx, `DELETE FROM knowledge_base_files WHERE knowledge_base_id = $1 AND file_id = $2`, kbID, id); err != nil {
 			return err
 		}
 	}

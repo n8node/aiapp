@@ -18,6 +18,19 @@ func NewModelHandler(models *service.ModelService) *ModelHandler {
 	return &ModelHandler{models: models}
 }
 
+func (h *ModelHandler) Catalog(w http.ResponseWriter, r *http.Request) {
+	if h.models == nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос")
+		return
+	}
+	items, err := h.models.Catalog(r.Context())
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"models": items}})
+}
+
 func (h *ModelHandler) List(w http.ResponseWriter, r *http.Request) {
 	if h.models == nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Не удалось выполнить запрос")
